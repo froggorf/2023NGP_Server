@@ -6,6 +6,8 @@
 #define BUFSIZE    512
 
 // 함수
+void ConnectAndAddPlayer(SOCKET&);
+void InitGame();						// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할 수 있도록 구현 예정
 DWORD WINAPI ProcessClient(LPVOID arg); // 클라이언트와 데이터 통신
 
 
@@ -36,38 +38,21 @@ int main(int argc, char *argv[])
 	if (retval == SOCKET_ERROR) err_quit("listen()");
 
 	// 플레이어 접속 체크 변수
-	SOCKET client_sock;
-	struct sockaddr_in clientaddr;
-	int addrlen;
+	
 	HANDLE hThread;
 
 
 
-	while (1) {
-		// accept()
-		addrlen = sizeof(clientaddr);
-		client_sock = accept(listen_sock, (struct sockaddr *)&clientaddr, &addrlen);
-		if (client_sock == INVALID_SOCKET) {
-			err_display("accept()");
-			continue;
-		}
-
-		// 클라이언트 주소 변수에 추가 및 플레이어 수 증가
-		clientAddr[Current_Player_Count] = clientaddr;
-		Current_Player_Count += 1;
-
-		// 접속한 클라이언트 정보 출력
-		char addr[INET_ADDRSTRLEN];
-		inet_ntop(AF_INET, &clientaddr.sin_addr, addr, sizeof(addr));
-		printf("\n[TCP 서버] 클라이언트 접속: IP 주소=%s, 포트 번호=%d\n",
-			addr, ntohs(clientaddr.sin_port));
-
-		printf("총 플레이어 수 : %d\n", Current_Player_Count);
-
-		if (Current_Player_Count == 3) break;
+	while (Current_Player_Count != MAXPLAYERCOUNT) {
+		ConnectAndAddPlayer(listen_sock);
+		//if (Current_Player_Count == 3) {
+		//	printf("플레이어 %d 명 입장 완료, 서버 시작", MAXPLAYERCOUNT);
+		//	break;
+		//}
 	}
 
-	printf("플레이어 %d 명 입장 완료, 서버 시작", MAXPLAYERCOUNT);
+	InitGame();
+
 	
 	//// 스레드 생성
 	//hThread = CreateThread(NULL, 0, ProcessClient,
@@ -81,6 +66,42 @@ int main(int argc, char *argv[])
 	// 윈속 종료
 	WSACleanup();
 	return 0;
+}
+
+void ConnectAndAddPlayer(SOCKET& listen_sock)
+{
+	SOCKET client_sock;
+	struct sockaddr_in clientaddr;
+
+	// accept()
+	int addrlen = sizeof(clientaddr);
+	client_sock = accept(listen_sock, (struct sockaddr*)&clientaddr, &addrlen);
+	if (client_sock == INVALID_SOCKET) {
+		err_display("accept()");
+		return;
+	}
+
+	// 클라이언트 주소 변수에 추가 및 플레이어 수 증가
+	clientAddr[Current_Player_Count] = clientaddr;
+	Current_Player_Count += 1;
+
+	// 새로운 플레이어 추가
+	struct Player_Info* newPlayer = new struct Player_Info();
+	Player_Info.push_back(newPlayer);
+
+	// 접속한 클라이언트 정보 출력
+	char addr[INET_ADDRSTRLEN];
+	inet_ntop(AF_INET, &clientaddr.sin_addr, addr, sizeof(addr));
+	printf("\n[TCP 서버] 클라이언트 접속: IP 주소=%s, 포트 번호=%d\n",
+		addr, ntohs(clientaddr.sin_port));
+
+	printf("총 플레이어 수 : %d\n", Current_Player_Count);
+
+}
+
+void InitGame()
+{
+	Player_Info.clear();
 }
 
 
