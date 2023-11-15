@@ -1,5 +1,6 @@
 #include "Common.h"
 #include "Global.h"
+#include "ServerData.h"
 
 #define SERVERPORT 9000
 #define BUFSIZE    512
@@ -7,9 +8,6 @@
 // 함수
 DWORD WINAPI ProcessClient(LPVOID arg); // 클라이언트와 데이터 통신
 
-// 변수
-int Current_Player_Count{};		//접속한 플레이어 인원 수 변수
-struct sockaddr_in clientAddr[MAXPLAYERCOUNT];
 
 int main(int argc, char *argv[])
 {
