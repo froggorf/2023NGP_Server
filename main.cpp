@@ -42,23 +42,22 @@ int main(int argc, char *argv[])
 	HANDLE hThread;
 
 
-
+	// 플레이어 지정한 수 인원 접속시키기
 	while (Current_Player_Count != MAXPLAYERCOUNT) {
 		ConnectAndAddPlayer(listen_sock);
-		//if (Current_Player_Count == 3) {
-		//	printf("플레이어 %d 명 입장 완료, 서버 시작", MAXPLAYERCOUNT);
-		//	break;
-		//}
 	}
 
+	// 게임 데이터 초기화
 	InitGame();
 
-	
-	//// 스레드 생성
+	// TODO: 게임 시작 되므로 게임 시작 관련 스레드 제작 예정
+	//// 스레드 생성 - 
 	//hThread = CreateThread(NULL, 0, ProcessClient,
 	//	(LPVOID)client_sock, 0, NULL);
 	//if (hThread == NULL) { closesocket(client_sock); }
 	//else { CloseHandle(hThread); }
+
+	// TODO: while문으로 main 쓰레드에서는 중력, 충돌체크 및 시간 전송 등이 진행되도록 구현 예정
 
 	// 소켓 닫기
 	closesocket(listen_sock);
