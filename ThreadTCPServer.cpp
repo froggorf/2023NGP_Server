@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 		return 1;
 
-	// 소켓 생성
+	// 소켓 생성(플레이어 접속 체크 소켓)
 	SOCKET listen_sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (listen_sock == INVALID_SOCKET) err_quit("socket()");
 
@@ -73,11 +73,14 @@ int main(int argc, char *argv[])
 	retval = listen(listen_sock, SOMAXCONN);
 	if (retval == SOCKET_ERROR) err_quit("listen()");
 
-	// 데이터 통신에 사용할 변수
+	// 플레이어 접속 체크 변수
 	SOCKET client_sock;
 	struct sockaddr_in clientaddr;
 	int addrlen;
 	HANDLE hThread;
+	int currentPlayerCount{};		//접속한 플레이어 인원 수 변수
+
+
 
 	while (1) {
 		// accept()
