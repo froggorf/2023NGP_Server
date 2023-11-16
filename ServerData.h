@@ -4,6 +4,8 @@
 #include <time.h>
 #include <chrono>
 
+
+
 // ±¸Á¶Ã¼
 struct Player_Info{
 	float fPosition_x, fPosition_y, fPosition_z;
