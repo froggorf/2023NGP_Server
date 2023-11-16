@@ -9,8 +9,10 @@
 void ConnectAndAddPlayer(SOCKET&);
 void InitGame();						// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할 수 있도록 구현 예정
 DWORD WINAPI ProcessClient(LPVOID arg); // 클라이언트와 데이터 통신
+void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock);
 VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime); 	// 시간 업데이트 함수
 void Send_Game_Time();
+void SendPlayerLocationToAllClient();
 int remainingSeconds = MAX_MIN * 60; // 5분을 초로 환산
 
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg);
@@ -87,16 +89,10 @@ int main(int argc, char *argv[])
 
 
 	// TODO: 게임 시작 되므로 게임 시작 관련 스레드 제작 예정
-	// 스레드 생성 - 
-	/*hThread = CreateThread(NULL, 0, ProcessClient,
-		(LPVOID)client_sock, 0, NULL);*/
+
 	// 타이머 초기화
 	SetTimer(NULL, TIMER_ID, 1000, TimerProc); // 1000ms(1초)마다 타이머 호출
 	std::cout << "타이머 시작 - " << remainingSeconds << std::endl;
-
-	// 타이머 쓰레드는 ProcessClient 안에서 지웠으므로 해당 코드는 지워도 될듯
-	/*if (hThread == NULL) { closesocket(client_sock); }
-	else { CloseHandle(hThread); }*/
 
 	// 플레이어의 키 인풋 정보를 받는 쓰레드 생성
 
@@ -138,7 +134,8 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 
 	// PlayerNumber 전달
 	send(client_sock, (char*)&Current_Player_Count, sizeof(Current_Player_Count), 0);
-
+	// 시간 통신용 소켓 벡터에 저장
+	socket_vector.push_back(client_sock);
 	// 클라이언트 주소 변수에 추가 및 플레이어 수 증가
 	clientAddr[Current_Player_Count] = clientaddr;
 	Current_Player_Count += 1;
@@ -155,6 +152,8 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 
 	printf("총 플레이어 수 : %d\n", Current_Player_Count);
 
+
+}
 
 void InitGame()
 {
@@ -215,13 +214,13 @@ VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
 	// 남은 시간이 0보다 크거나 같으면 클라이언트로 시간 업데이트 및 전송
 	if (remainingSeconds >= 0) {
 		Send_Game_Time();
-		std::cout << remainingSeconds << std::endl;
 	}
 	else {
 		// 게임 종료 이벤트 여기에 추가
 		
 		// 타이머 종료
 		KillTimer(hwnd, TIMER_ID);
+		for (auto i : socket_vector)	closesocket(i);		// 시간 소켓 close
 	}
 }
 
@@ -235,8 +234,7 @@ void Send_Game_Time() {
 			break;
 		}
 	}
-	std::cout << "Sending time to the client: " << remainingSeconds << " seconds remaining" << std::endl;
-	// 클라이언트로 시간 값을 전송하는 코드를 여기에 구현하세요.
+	std::cout << "Sending time to the client: " << remainingSeconds << " seconds" << std::endl;
 }
 
 void SendPlayerLocationToAllClient()
