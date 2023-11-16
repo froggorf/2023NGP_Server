@@ -1,4 +1,4 @@
 ﻿  main.cpp
 C:\Users\Administrator\Desktop\2023NGP_Server\2023NGP_Server\main.cpp(71,9): warning C4101: 'hThread' :참조되지 않은 지역 변수입니다.
-C:\Users\Administrator\Desktop\2023NGP_Server\2023NGP_Server\main.cpp(190,21): warning C4101: 'clientaddr' :참조되지 않은 지역 변수입니다.
+C:\Users\Administrator\Desktop\2023NGP_Server\2023NGP_Server\main.cpp(184,21): warning C4101: 'clientaddr' :참조되지 않은 지역 변수입니다.
   ThreadTCPServer.vcxproj -> C:\Users\Administrator\Desktop\2023NGP_Server\2023NGP_Server\x64\Debug\ThreadTCPServer.exe

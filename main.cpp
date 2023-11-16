@@ -9,7 +9,7 @@
 void ConnectAndAddPlayer(SOCKET&);
 void InitGame();						// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할 수 있도록 구현 예정
 void CreateClientKeyInputThread(SOCKET&);
-DWORD WINAPI ProcessClient(LPVOID arg); // 클라이언트와 데이터 통신
+void SendPlayerLocationToAllClient();
 
 VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
 void Send_Game_Time();
@@ -108,6 +108,8 @@ int main(int argc, char *argv[])
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
+
+		SendPlayerLocationToAllClient();
 	}
 	// 소켓 닫기
 	//closesocket(listen_sock);
@@ -149,14 +151,6 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 		addr, ntohs(clientaddr.sin_port));
 
 	printf("총 플레이어 수 : %d\n", Current_Player_Count);
-
-
-	HANDLE hThread;
-
-	hThread = CreateThread(NULL, 0, ProcessClient,
-		(LPVOID)client_sock, 0, NULL);
-	if (hThread == NULL) { closesocket(client_sock); }
-	else { CloseHandle(hThread); }
 }
 
 void InitGame()
@@ -198,62 +192,15 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 			printf("?\n");
 			break;
 		}
-		
+		printf("%d 플레이어가 %d 버튼 ", clientKeyInput.PlayerNumber, clientKeyInput.Key);
 		if(clientKeyInput.KeyDown)
 		{
-			printf("%d 눌림\n", clientKeyInput.Key);
+			printf("누름\n");
 		}else
 		{
-			printf("%d 뗌\n", clientKeyInput.Key);
+			printf("뗌\n");
 		}
 	}
-	return 0;
-}
-
-DWORD WINAPI ProcessClient(LPVOID arg)
-{
-	printf("aaa\n");
-	int retval;
-	SOCKET client_sock = (SOCKET)arg;
-	struct sockaddr_in clientaddr;
-	char addr[INET_ADDRSTRLEN];
-	int addrlen;
-	char buf[512 + 1];
-
-	// 클라이언트 정보 얻기
-	addrlen = sizeof(clientaddr);
-	getpeername(client_sock, (struct sockaddr*)&clientaddr, &addrlen);
-	inet_ntop(AF_INET, &clientaddr.sin_addr, addr, sizeof(addr));
-
-	// 클라이언트 소켓 추가
-	socket_vector.push_back(client_sock);
-
-	while (1) {
-		// 데이터 받기
-		retval = recv(client_sock, buf, 512, 0);
-		if (retval == SOCKET_ERROR) {
-			err_display("recv()");
-			break;
-		}
-		else if (retval == 0)
-			break;
-
-		// 받은 데이터 출력
-		buf[retval] = '\0';
-		printf("[TCP/%s:%d] %s\n", addr, ntohs(clientaddr.sin_port), buf);
-
-		// 데이터 보내기
-		retval = send(client_sock, buf, retval, 0);
-		if (retval == SOCKET_ERROR) {
-			err_display("send()");
-			break;
-		}
-	}
-
-	// 소켓 닫기
-	closesocket(client_sock);
-	printf("[TCP 서버] 클라이언트 종료: IP 주소=%s, 포트 번호=%d\n",
-		addr, ntohs(clientaddr.sin_port));
 	return 0;
 }
 
@@ -291,4 +238,9 @@ void Send_Game_Time() {
 	std::cout << "Sending time to the client: " << remainingSeconds << " seconds remaining" << std::endl;
 	// 클라이언트로 시간 값을 전송하는 코드를 여기에 구현하세요.
 
+}
+
+void SendPlayerLocationToAllClient()
+{
+	
 }
