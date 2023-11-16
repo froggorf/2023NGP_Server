@@ -1,5 +1,5 @@
 ﻿  main.cpp
 C:\Users\Administrator\Desktop\2023NGP_Server\2023NGP_Server\Global.h(1,1): warning C4828: 파일에 0x86 오프셋에서 시작하는 문자가 포함되어 있습니다. 이 문자는 현재 원본 문자 집합에서 잘못된 문자입니다(코드 페이지 949).
 C:\Users\Administrator\Desktop\2023NGP_Server\2023NGP_Server\main.cpp(65,9): warning C4101: 'hThread' :참조되지 않은 지역 변수입니다.
-C:\Users\Administrator\Desktop\2023NGP_Server\2023NGP_Server\main.cpp(158,21): warning C4101: 'clientaddr' :참조되지 않은 지역 변수입니다.
+C:\Users\Administrator\Desktop\2023NGP_Server\2023NGP_Server\main.cpp(157,21): warning C4101: 'clientaddr' :참조되지 않은 지역 변수입니다.
   ThreadTCPServer.vcxproj -> C:\Users\Administrator\Desktop\2023NGP_Server\2023NGP_Server\x64\Debug\ThreadTCPServer.exe

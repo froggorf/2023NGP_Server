@@ -140,7 +140,6 @@ void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
 	int addrlen = sizeof(clientaddr);
 	*client_sock = accept(KeyInput_listen_sock, (struct sockaddr*)&clientaddr, &addrlen);
 	if (*client_sock == INVALID_SOCKET) {
-		printf("¿Ã∞‘ ¿ŒπÎ∏ÆµÂ¥œ?\n");
 		err_display("CreateClientKeyInputThread() - accept()");
 		return;
 	}
@@ -157,22 +156,22 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 	SOCKET* ClientKeyInputSocket = (SOCKET*)arg;
 	struct sockaddr_in clientaddr;
 
-	struct KeyInput* clientKeyInput{};
-	char clientdata[5];
+	struct KeyInput clientKeyInput{};
 	int retval;
 	while(1)
 	{
-		retval = recv(*ClientKeyInputSocket, clientdata, sizeof(clientdata), 0);
-		clientKeyInput = (KeyInput*)clientdata;
-		if (retval == SOCKET_ERROR) {
+		retval = recv(*ClientKeyInputSocket, (char*)&clientKeyInput, sizeof(clientKeyInput), 0);
+		if (retval == SOCKET_ERROR||(clientKeyInput.Key<0 || clientKeyInput.Key>256)) {
+			printf("?\n");
 			break;
 		}
-		if(clientKeyInput->KeyDown)
+		
+		if(clientKeyInput.KeyDown)
 		{
-			printf("%d ¥≠∏≤\n", clientKeyInput->Key);
+			printf("%d ¥≠∏≤\n", clientKeyInput.Key);
 		}else
 		{
-			printf("%d ∂¿\n", clientKeyInput->Key);
+			printf("%d ∂¿\n", clientKeyInput.Key);
 		}
 	}
 	return 0;
