@@ -32,3 +32,6 @@
 *.app
 
 /.vs
+.vs/
+.vs\
+.vs/ThreadTCPServer/v17/Browse.VC.db
