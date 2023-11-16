@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 
+
+
 // ±¸Á¶Ã¼
 struct Player_Info{
 	float fPosition_x, fPosition_y, fPosition_z;

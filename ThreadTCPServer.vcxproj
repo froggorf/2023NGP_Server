@@ -146,6 +146,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ClientKeyInput.h" />
     <ClInclude Include="Global.h" />
     <ClInclude Include="ServerData.h" />
   </ItemGroup>

@@ -1,28 +1,32 @@
 #include "Common.h"
 #include "Global.h"
 #include "ServerData.h"
+#include "ClientKeyInput.h"
 
-#define SERVERPORT 9000
-#define BUFSIZE    512
+
 
 // 함수
 void ConnectAndAddPlayer(SOCKET&);
 void InitGame();						// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할 수 있도록 구현 예정
+void CreateClientKeyInputThread(SOCKET&);
 DWORD WINAPI ProcessClient(LPVOID arg); // 클라이언트와 데이터 통신
+DWORD WINAPI ProcessClientKeyInput(LPVOID arg);
 
+// 윈속 변수
+WSADATA wsa;
 
 int main(int argc, char *argv[])
 {
 	int retval;
 
+	//----------------로그인 소켓 만드는 과정----------------   //TODO: 아래꺼랑 합쳐서 함수화 처리 예정
 	// 윈속 초기화
-	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 		return 1;
 
 	// 소켓 생성(플레이어 접속 체크 소켓)
-	SOCKET listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (listen_sock == INVALID_SOCKET) err_quit("socket()");
+	SOCKET login_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (login_listen_sock == INVALID_SOCKET) err_quit("socket()");
 
 	// bind()
 	struct sockaddr_in serveraddr;
@@ -30,25 +34,49 @@ int main(int argc, char *argv[])
 	serveraddr.sin_family = AF_INET;
 	serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	serveraddr.sin_port = htons(SERVERPORT);
-	retval = bind(listen_sock, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+	retval = bind(login_listen_sock, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
 	if (retval == SOCKET_ERROR) err_quit("bind()");
 
 	// listen()
-	retval = listen(listen_sock, SOMAXCONN);
+	retval = listen(login_listen_sock, SOMAXCONN);
 	if (retval == SOCKET_ERROR) err_quit("listen()");
+
+	//---------------- 소켓 만드는 과정(키 인풋 소켓)----------------
+	// 소켓 생성(키 인풋 리슨 소켓)
+	SOCKET KeyInput_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (KeyInput_listen_sock == INVALID_SOCKET) err_quit("socket()");
+
+	// bind() - KEYINPUTSERVERPORT 로 바인드,
+	struct sockaddr_in serveraddr_keyinput;
+	memset(&serveraddr_keyinput, 0, sizeof(serveraddr_keyinput));
+	serveraddr_keyinput.sin_family = AF_INET;
+	serveraddr_keyinput.sin_addr.s_addr = htonl(INADDR_ANY);
+	serveraddr_keyinput.sin_port = htons(KEYINPUTSERVERPORT);
+
+	if (bind(KeyInput_listen_sock, (struct sockaddr*)&serveraddr_keyinput, sizeof(serveraddr_keyinput))
+		== SOCKET_ERROR) err_quit("CreateClientKeyInputThread() - bind()");
+
+	// listen()
+	if (listen(KeyInput_listen_sock, SOMAXCONN)
+		== SOCKET_ERROR) err_quit("CreateClientKeyInputThread() - listen()");
 
 	// 플레이어 접속 체크 변수
 	
 	HANDLE hThread;
 
 
-	// 플레이어 지정한 수 인원 접속시키기
-	while (Current_Player_Count != MAXPLAYERCOUNT) {
-		ConnectAndAddPlayer(listen_sock);
-	}
-
 	// 게임 데이터 초기화
 	InitGame();
+
+	// 플레이어 지정한 수 인원 접속시키기
+	while (Current_Player_Count != MAXPLAYERCOUNT) {
+		ConnectAndAddPlayer(login_listen_sock);
+		CreateClientKeyInputThread(KeyInput_listen_sock);
+	}
+
+	// 소켓 닫기
+	closesocket(login_listen_sock);
+
 
 	// TODO: 게임 시작 되므로 게임 시작 관련 스레드 제작 예정
 	//// 스레드 생성 - 
@@ -57,10 +85,10 @@ int main(int argc, char *argv[])
 	//if (hThread == NULL) { closesocket(client_sock); }
 	//else { CloseHandle(hThread); }
 
+	// 플레이어의 키 인풋 정보를 받는 쓰레드 생성
+
 	// TODO: while문으로 main 쓰레드에서는 중력, 충돌체크 및 시간 전송 등이 진행되도록 구현 예정
 
-	// 소켓 닫기
-	closesocket(listen_sock);
 
 	// 윈속 종료
 	WSACleanup();
@@ -103,6 +131,52 @@ void InitGame()
 	Player_Info.clear();
 }
 
+void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
+{
+	SOCKET* client_sock = new SOCKET();
+	struct sockaddr_in clientaddr;
+
+	// accept()
+	int addrlen = sizeof(clientaddr);
+	*client_sock = accept(KeyInput_listen_sock, (struct sockaddr*)&clientaddr, &addrlen);
+	if (*client_sock == INVALID_SOCKET) {
+		printf("이게 인밸리드니?\n");
+		err_display("CreateClientKeyInputThread() - accept()");
+		return;
+	}
+
+	HANDLE hThread = CreateThread(NULL, 0, ProcessClientKeyInput,
+		(LPVOID)client_sock, 0, NULL);
+	if (hThread == NULL) {  closesocket(*client_sock); }
+	else { CloseHandle(hThread); }
+}
+
+DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
+{
+	printf("키 인풋 쓰레드 시작\n");
+	SOCKET* ClientKeyInputSocket = (SOCKET*)arg;
+	struct sockaddr_in clientaddr;
+
+	struct KeyInput* clientKeyInput{};
+	char clientdata[5];
+	int retval;
+	while(1)
+	{
+		retval = recv(*ClientKeyInputSocket, clientdata, sizeof(clientdata), 0);
+		clientKeyInput = (KeyInput*)clientdata;
+		if (retval == SOCKET_ERROR) {
+			break;
+		}
+		if(clientKeyInput->KeyDown)
+		{
+			printf("%d 눌림\n", clientKeyInput->Key);
+		}else
+		{
+			printf("%d 뗌\n", clientKeyInput->Key);
+		}
+	}
+	return 0;
+}
 
 DWORD WINAPI ProcessClient(LPVOID arg)
 {
@@ -112,7 +186,7 @@ DWORD WINAPI ProcessClient(LPVOID arg)
 	struct sockaddr_in clientaddr;
 	char addr[INET_ADDRSTRLEN];
 	int addrlen;
-	char buf[BUFSIZE + 1];
+	char buf[512 + 1];
 
 	// 클라이언트 정보 얻기
 	addrlen = sizeof(clientaddr);
@@ -121,7 +195,7 @@ DWORD WINAPI ProcessClient(LPVOID arg)
 
 	while (1) {
 		// 데이터 받기
-		retval = recv(client_sock, buf, BUFSIZE, 0);
+		retval = recv(client_sock, buf, 512, 0);
 		if (retval == SOCKET_ERROR) {
 			err_display("recv()");
 			break;
