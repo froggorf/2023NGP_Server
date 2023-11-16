@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	// 소켓 닫기
-	closesocket(listen_sock);
+	//closesocket(listen_sock);
 
 
 	// 윈속 종료
@@ -130,6 +130,9 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 		err_display("accept()");
 		return;
 	}
+
+	// PlayerNumber 전달
+	send(client_sock, (char*)&Current_Player_Count, sizeof(Current_Player_Count), 0);
 
 	// 클라이언트 주소 변수에 추가 및 플레이어 수 증가
 	clientAddr[Current_Player_Count] = clientaddr;
