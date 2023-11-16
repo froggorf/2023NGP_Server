@@ -8,7 +8,6 @@
 // 함수
 void ConnectAndAddPlayer(SOCKET&);
 void InitGame();						// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할 수 있도록 구현 예정
-DWORD WINAPI ProcessClient(LPVOID arg); // 클라이언트와 데이터 통신
 void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock);
 VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime); 	// 시간 업데이트 함수
 void Send_Game_Time();
@@ -16,6 +15,9 @@ void SendPlayerLocationToAllClient();
 int remainingSeconds = MAX_MIN * 60; // 5분을 초로 환산
 
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg);
+
+void CreateCubeThread(SOCKET& Cube_listen_sock);
+DWORD WINAPI EchoClientRequestCube(LPVOID arg);
 
 // 윈속 변수
 WSADATA wsa;
@@ -65,22 +67,38 @@ int main(int argc, char *argv[])
 	// listen()
 	if (listen(KeyInput_listen_sock, SOMAXCONN)
 		== SOCKET_ERROR) err_quit("CreateClientKeyInputThread() - listen()");
-
-	// 플레이어 접속 체크 변수
 	
-	HANDLE hThread;
+
+	//---------------- 소켓 만드는 과정(큐브 소켓)----------------
+	// 소켓 생성(큐브 리슨 소켓)
+	SOCKET Cube_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (Cube_listen_sock == INVALID_SOCKET) err_quit("socket()");
+
+	// bind()
+	struct sockaddr_in serveraddr_Cube;
+	memset(&serveraddr_Cube, 0, sizeof(serveraddr_Cube));
+	serveraddr_Cube.sin_family = AF_INET;
+	serveraddr_Cube.sin_addr.s_addr = htonl(INADDR_ANY);
+	serveraddr_Cube.sin_port = htons(CUBESERVERPORT);
+
+	if (bind(Cube_listen_sock, (struct sockaddr*)&serveraddr_Cube, sizeof(serveraddr_Cube))
+		== SOCKET_ERROR) err_quit("CreateCubeThread() - bind()");
+
+	// listen()
+	if (listen(Cube_listen_sock, SOMAXCONN)
+		== SOCKET_ERROR) err_quit("CreateCubeThread() - listen()");
 
 
+	//-----------------
 	// 게임 데이터 초기화
 	InitGame();
 
-
-	
 
 	// 플레이어 지정한 수 인원 접속시키기
 	while (Current_Player_Count != MAXPLAYERCOUNT) {
 		ConnectAndAddPlayer(login_listen_sock);
 		CreateClientKeyInputThread(KeyInput_listen_sock);
+		CreateCubeThread(Cube_listen_sock);
 	}
 
 	// 소켓 닫기
@@ -158,6 +176,7 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 void InitGame()
 {
 	Player_Info.clear();
+	Total_Cube.clear();
 }
 
 void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
@@ -202,6 +221,64 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 		{
 			printf("뗌\n");
 		}
+	}
+	return 0;
+}
+
+
+void CreateCubeThread(SOCKET& Cube_listen_sock)
+{
+	printf("큐브 쓰레드 시작\n");
+	SOCKET client_sock;
+	struct sockaddr_in clientaddr;
+
+	// accept()
+	int addrlen = sizeof(clientaddr);
+	client_sock = accept(Cube_listen_sock, (struct sockaddr*)&clientaddr, &addrlen);
+	if (client_sock == INVALID_SOCKET) {
+		err_display("CreateCubeThread() - accept()");
+		return;
+	}
+	socket_Cube_vector.push_back(client_sock);
+	HANDLE hThread = CreateThread(NULL, 0, EchoClientRequestCube,
+		(LPVOID)client_sock, 0, NULL);
+	if (hThread == NULL) { closesocket(client_sock); }
+	else { CloseHandle(hThread); }
+}
+
+
+DWORD WINAPI EchoClientRequestCube(LPVOID arg)
+{
+	printf("키 인풋 쓰레드 시작\n");
+	SOCKET CubeSocket = (SOCKET)arg;
+	struct sockaddr_in clientaddr;
+
+	struct Cube_Info clientCubeInput;
+	int retval;
+	while (1)
+	{
+		// 큐브 리시브
+		retval = recv(CubeSocket, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+		if (retval == SOCKET_ERROR) {
+			printf("?\n");
+			break;
+		}
+		printf("Cube Position - %.2f, %.2f, %.2f", clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
+		printf("Cube Color - %.2f, %.2f, %.2f", clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b);
+
+		// 여기서 큐브와 사람 충돌체크
+		//..
+
+		// 큐브 send to every cube
+		for (auto i : socket_Cube_vector) {
+			int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+			if (retval == SOCKET_ERROR) {
+				err_display("send()");
+				break;
+			}
+			std::cout << "Sending cube_info to the client" << std::endl;
+		}
+		
 	}
 	return 0;
 }
