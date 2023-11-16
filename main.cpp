@@ -9,8 +9,8 @@
 void ConnectAndAddPlayer(SOCKET&);
 void InitGame();						// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할 수 있도록 구현 예정
 DWORD WINAPI ProcessClient(LPVOID arg); // 클라이언트와 데이터 통신
-VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
-void Send_Game_Time();
+VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);	// 시간 업데이트 함수
+void Send_Game_Time();				// 현재 남은 시간 모든 서버로 전송
 int remainingSeconds = MAX_MIN * 60; // 5분을 초로 환산
 
 int main(int argc, char *argv[])
@@ -61,17 +61,23 @@ int main(int argc, char *argv[])
 	// 타이머 초기화
 	SetTimer(NULL, TIMER_ID, 1000, TimerProc); // 1000ms(1초)마다 타이머 호출
 	std::cout << "타이머 시작 - " << remainingSeconds << std::endl;
+
+	// 타이머 쓰레드는 ProcessClient 안에서 지웠으므로 해당 코드는 지워도 될듯
 	/*if (hThread == NULL) { closesocket(client_sock); }
 	else { CloseHandle(hThread); }*/
 
 	// TODO: while문으로 main 쓰레드에서는 중력, 충돌체크 및 시간 전송 등이 진행되도록 구현 예정
+	// 메인 루프
 	while (true) {
+
+		// 시간 처리를 위한 메세지 루프
 		MSG msg;
 		while (GetMessage(&msg, NULL, 0, 0)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
 	}
+
 	// 소켓 닫기
 	closesocket(listen_sock);
 
@@ -110,6 +116,7 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 	printf("총 플레이어 수 : %d\n", Current_Player_Count);
 
 
+	// 각 클라이언트 쓰레드 생성
 	HANDLE hThread;
 
 	hThread = CreateThread(NULL, 0, ProcessClient,
@@ -176,15 +183,13 @@ DWORD WINAPI ProcessClient(LPVOID arg)
 VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
 	// 시간 업데이트
 	remainingSeconds--;
-	std::cout << "시간 카운트 중 - " << remainingSeconds << std::endl;
-
 	// 남은 시간이 0보다 크거나 같으면 클라이언트로 시간 업데이트 및 전송
 	if (remainingSeconds >= 0) {
 		Send_Game_Time();
 		std::cout << remainingSeconds << std::endl;
 	}
 	else {
-		// 게임 종료 이벤트 추가
+		// 게임 종료 이벤트 여기에 추가
 		
 		// 타이머 종료
 		KillTimer(hwnd, TIMER_ID);
@@ -193,8 +198,7 @@ VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
 
 
 void Send_Game_Time() {
-	// 데이터 보내기
-	std::cout << "시간 보내는 중 - " << remainingSeconds << std::endl;
+	// 시간 데이터 보내기
 	for (auto i : socket_vector) {
 		int retval = send(i, (char*)&remainingSeconds, sizeof(int), 0);
 		if (retval == SOCKET_ERROR) {
@@ -203,6 +207,4 @@ void Send_Game_Time() {
 		}
 	}
 	std::cout << "Sending time to the client: " << remainingSeconds << " seconds remaining" << std::endl;
-	// 클라이언트로 시간 값을 전송하는 코드를 여기에 구현하세요.
-
 }

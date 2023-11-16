@@ -14,4 +14,4 @@ struct Player_Info{
 int Current_Player_Count{};										// 접속한 플레이어 인원 수 
 struct sockaddr_in clientAddr[MAXPLAYERCOUNT];					// 클라이언트 주소 정보
 std::vector<Player_Info*> Player_Info;							// 플레이어 정보
-std::vector<SOCKET> socket_vector;
+std::vector<SOCKET> socket_vector;								// 각 쓰레드에서 얻은 소켓 정보(TCP, time)
