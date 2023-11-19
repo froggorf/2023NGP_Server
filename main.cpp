@@ -14,7 +14,12 @@ void Send_Game_Time();
 void SendPlayerLocationToAllClient();
 int remainingSeconds = MAX_MIN * 60; // 5분을 초로 환산
 
+// 키 인풋 받아 처리하는 쓰레드
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg);
+
+// 플레이어 정보 전송하는 쓰레드
+void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock);
+DWORD WINAPI SendPlayerDataToClient(LPVOID arg);
 
 void CreateCubeThread(SOCKET& Cube_listen_sock);
 DWORD WINAPI EchoClientRequestCube(LPVOID arg);
@@ -88,6 +93,24 @@ int main(int argc, char *argv[])
 	if (listen(Cube_listen_sock, SOMAXCONN)
 		== SOCKET_ERROR) err_quit("CreateCubeThread() - listen()");
 
+	//---------------- 소켓 만드는 과정(플레이어 데이터 전송 소켓)----------------
+	// 소켓 생성(플레이어 데이터 전송 소켓)
+	SOCKET send_playerdata_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (KeyInput_listen_sock == INVALID_SOCKET) err_quit("socket()");
+
+	// bind()
+	struct sockaddr_in serveraddr_sendPlayerData;
+	memset(&serveraddr_sendPlayerData, 0, sizeof(serveraddr_sendPlayerData));
+	serveraddr_sendPlayerData.sin_family = AF_INET;
+	serveraddr_sendPlayerData.sin_addr.s_addr = htonl(INADDR_ANY);
+	serveraddr_sendPlayerData.sin_port = htons(SENDPLAYERDATAPORT);
+
+	if (bind(send_playerdata_listen_sock, (struct sockaddr*)&serveraddr_sendPlayerData, sizeof(serveraddr_sendPlayerData))
+		== SOCKET_ERROR) err_quit("bind()");
+
+	// listen()
+	if (listen(send_playerdata_listen_sock, SOMAXCONN)
+		== SOCKET_ERROR) err_quit("listen()");
 
 	//-----------------
 	// 게임 데이터 초기화
@@ -99,6 +122,7 @@ int main(int argc, char *argv[])
 		ConnectAndAddPlayer(login_listen_sock);
 		CreateClientKeyInputThread(KeyInput_listen_sock);
 		CreateCubeThread(Cube_listen_sock);
+		CreateSendPlayerDataThread(send_playerdata_listen_sock);
 	}
 
 	// 소켓 닫기
@@ -123,6 +147,7 @@ int main(int argc, char *argv[])
 		while (GetMessage(&msg, NULL, 0, 0)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
+
 		}
 
 		SendPlayerLocationToAllClient();
@@ -158,9 +183,9 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 	clientAddr[Current_Player_Count] = clientaddr;
 	Current_Player_Count += 1;
 
-	// 새로운 플레이어 추가
-	struct Player_Info* newPlayer = new struct Player_Info();
-	Player_Info.push_back(newPlayer);
+	//// 새로운 플레이어 추가
+	//struct Player_Info* newPlayer = new struct Player_Info();
+	//Player_Info.push_back(newPlayer);
 
 	// 접속한 클라이언트 정보 출력
 	char addr[INET_ADDRSTRLEN];
@@ -175,7 +200,7 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 
 void InitGame()
 {
-	Player_Info.clear();
+
 	Total_Cube.clear();
 }
 
@@ -217,10 +242,58 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 		if(clientKeyInput.KeyDown)
 		{
 			printf("누름\n");
+
+
 		}else
 		{
 			printf("뗌\n");
 		}
+	}
+	return 0;
+}
+
+void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
+{
+	SOCKET client_sock;
+	struct sockaddr_in clientaddr;
+
+	// accept()
+	int addrlen = sizeof(clientaddr);
+	client_sock = accept(senddata_listen_sock, (struct sockaddr*)&clientaddr, &addrlen);
+	if (client_sock == INVALID_SOCKET) {
+		err_display("CreateSendPlayerDataThread() - accept()");
+		return;
+	}
+
+	HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
+		(LPVOID)client_sock, 0, NULL);
+	if (hThread == NULL) { closesocket(client_sock); }
+	else { CloseHandle(hThread); }
+}
+
+DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
+{
+	printf("플레이어 정보 전송 시작\n");
+	SOCKET SendPlayerDataSocket = (SOCKET)arg;
+	struct sockaddr_in clientaddr;
+
+	
+	
+	int retval;
+	while (1)
+	{
+		Sleep(16);
+		Player_Info[0].fPosition_y += 0.05;
+		Player_Info[1].fPosition_x -=0.05;
+		Player_Info[2].fPosition_x +=0.05;
+		Player_Info[2].fPosition_y +=0.05;
+		printf("플레이어 정보 전송\n");
+		retval = send(SendPlayerDataSocket, (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
+		if (retval == SOCKET_ERROR ) {
+			printf("?\n");
+			break;
+		}
+		
 	}
 	return 0;
 }
@@ -249,7 +322,6 @@ void CreateCubeThread(SOCKET& Cube_listen_sock)
 
 DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 {
-	printf("키 인풋 쓰레드 시작\n");
 	SOCKET CubeSocket = (SOCKET)arg;
 	struct sockaddr_in clientaddr;
 
