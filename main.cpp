@@ -2,6 +2,7 @@
 #include "Global.h"
 #include "ServerData.h"
 #include "ClientKeyInput.h"
+#include "ProcessClientInput.h"
 
 
 
@@ -148,6 +149,7 @@ int main(int argc, char *argv[])
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 
+			//ProcessClientInput();
 		}
 
 		SendPlayerLocationToAllClient();
@@ -179,13 +181,22 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 	send(client_sock, (char*)&Current_Player_Count, sizeof(Current_Player_Count), 0);
 	// 시간 통신용 소켓 벡터에 저장
 	socket_vector.push_back(client_sock);
-	// 클라이언트 주소 변수에 추가 및 플레이어 수 증가
+	// 클라이언트 주소 변수에 추가 
 	clientAddr[Current_Player_Count] = clientaddr;
+
+	Player_Info[Current_Player_Count].fPosition_x = 0.0f;
+	Player_Info[Current_Player_Count].fPosition_y = 50.0f;
+	Player_Info[Current_Player_Count].fPosition_z = 0.0f;
+
+	// 플레이어 수 증가
 	Current_Player_Count += 1;
 
 	//// 새로운 플레이어 추가
 	//struct Player_Info* newPlayer = new struct Player_Info();
 	//Player_Info.push_back(newPlayer);
+	// 플레이어 위치 갱신
+	
+	
 
 	// 접속한 클라이언트 정보 출력
 	char addr[INET_ADDRSTRLEN];
@@ -200,6 +211,12 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 
 void InitGame()
 {
+	for (int i = 0; i < MAXPLAYERCOUNT; ++i) {
+		Player_Info[i].fPosition_x = 0.0f;
+		Player_Info[i].fPosition_y = -50.0f;
+		Player_Info[i].fPosition_z = 0.0f;
+	}
+
 
 	Total_Cube.clear();
 }
@@ -241,11 +258,13 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 		printf("%d 플레이어가 %d 버튼 ", clientKeyInput.PlayerNumber, clientKeyInput.Key);
 		if(clientKeyInput.KeyDown)
 		{
+			clientKeyBuffer[clientKeyInput.PlayerNumber][clientKeyInput.Key] = true;
 			printf("누름\n");
 
 
 		}else
 		{
+			clientKeyBuffer[clientKeyInput.PlayerNumber][clientKeyInput.Key] = false;
 			printf("뗌\n");
 		}
 	}
@@ -282,12 +301,11 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 	int retval;
 	while (1)
 	{
-		Sleep(16);
+		Sleep(30);
 		Player_Info[0].fPosition_y += 0.05;
 		Player_Info[1].fPosition_x -=0.05;
 		Player_Info[2].fPosition_x +=0.05;
 		Player_Info[2].fPosition_y +=0.05;
-		printf("플레이어 정보 전송\n");
 		retval = send(SendPlayerDataSocket, (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
 		if (retval == SOCKET_ERROR ) {
 			printf("?\n");

@@ -144,10 +144,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ProcessClientInput.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClientKeyInput.h" />
     <ClInclude Include="Global.h" />
+    <ClInclude Include="ProcessClientInput.h" />
     <ClInclude Include="ServerData.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
