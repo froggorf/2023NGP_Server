@@ -23,6 +23,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg);
 
 void CreateCubeThread(SOCKET& Cube_listen_sock);
 DWORD WINAPI EchoClientRequestCube(LPVOID arg);
+bool Check_Add_Cube(Cube_Info cube);
 
 // 윈속 변수
 WSADATA wsa;
@@ -183,10 +184,6 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 	clientAddr[Current_Player_Count] = clientaddr;
 	Current_Player_Count += 1;
 
-	//// 새로운 플레이어 추가
-	//struct Player_Info* newPlayer = new struct Player_Info();
-	//Player_Info.push_back(newPlayer);
-
 	// 접속한 클라이언트 정보 출력
 	char addr[INET_ADDRSTRLEN];
 	inet_ntop(AF_INET, &clientaddr.sin_addr, addr, sizeof(addr));
@@ -194,13 +191,10 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 		addr, ntohs(clientaddr.sin_port));
 
 	printf("총 플레이어 수 : %d\n", Current_Player_Count);
-
-
 }
 
 void InitGame()
 {
-
 	Total_Cube.clear();
 }
 
@@ -276,8 +270,6 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 	printf("플레이어 정보 전송 시작\n");
 	SOCKET SendPlayerDataSocket = (SOCKET)arg;
 	struct sockaddr_in clientaddr;
-
-	
 	
 	int retval;
 	while (1)
@@ -287,7 +279,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		Player_Info[1].fPosition_x -=0.05;
 		Player_Info[2].fPosition_x +=0.05;
 		Player_Info[2].fPosition_y +=0.05;
-		printf("플레이어 정보 전송\n");
+		//printf("플레이어 정보 전송\n");
 		retval = send(SendPlayerDataSocket, (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
 		if (retval == SOCKET_ERROR ) {
 			printf("?\n");
@@ -335,20 +327,27 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 			printf("?\n");
 			break;
 		}
-		printf("Cube Position - %.2f, %.2f, %.2f", clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
-		printf("Cube Color - %.2f, %.2f, %.2f", clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b);
+		printf("Cube Position - %.2f, %.2f, %.2f\n", clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
+		printf("Cube Color - %.2f, %.2f, %.2f\n", clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b);
 
 		// 여기서 큐브와 사람 충돌체크
-		//..
-
-		// 큐브 send to every cube
-		for (auto i : socket_Cube_vector) {
-			int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
-			if (retval == SOCKET_ERROR) {
-				err_display("send()");
-				break;
+		if (Check_Add_Cube(clientCubeInput))
+		{
+			printf("큐브 설치 불가능\n");
+		}
+		// 가능시에만 각 클라에게 큐브 정보 send
+		else 
+		{
+			printf("큐브 설치 가능\n");
+			// 큐브 send to every client
+			for (auto i : socket_Cube_vector) {
+				int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+				if (retval == SOCKET_ERROR) {
+					err_display("send()");
+					break;
+				}
+				std::cout << "Sending cube_info to the client" << std::endl;
 			}
-			std::cout << "Sending cube_info to the client" << std::endl;
 		}
 		
 	}
@@ -390,3 +389,26 @@ void SendPlayerLocationToAllClient()
 {
 
 }
+
+bool Check_Add_Cube(Cube_Info cube)
+{
+	for (int i = 0; i < MAXPLAYERCOUNT; i++)
+	{
+		// X, Z 축에 대해 겹치는지 확인
+		float xDiff = Player_Info[i].fPosition_x - cube.fPosition_x;
+		float zDiff = Player_Info[i].fPosition_z - cube.fPosition_z;
+
+		bool isXInRange = (xDiff >= -5.0f) && (xDiff <= 5.0f);
+		bool isZInRange = (zDiff >= -5.0f) && (zDiff <= 5.0f);
+
+		// Y 축에 대해 높이 확인
+		bool isYInRange = (Player_Info[i].fPosition_y >= cube.fPosition_y) && (Player_Info[i].fPosition_y <= cube.fPosition_y + 10.0f);
+
+		printf("xDiff : %.2f, zDiff : %.2f, bool Y : %d\n", xDiff, zDiff, isYInRange);
+		// 모든 축에서 조건이 만족하는지 확인하여 블록 안에 플레이어가 있는지 반환
+		return isXInRange && isZInRange && isYInRange;
+		
+	}
+}
+
+
