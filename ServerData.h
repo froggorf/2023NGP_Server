@@ -17,6 +17,11 @@ struct Cube_Info {
 	float fColor_r, fColor_g, fColor_b;
 };
 
+struct Look_Data
+{
+	int PlayerNumber;
+	float fLook_x, fLook_z;
+};
 // 변수
 //int Cube_num = 0;												// 설치된 큐브 개수
 int Current_Player_Count;										// 접속한 플레이어 인원 수 
@@ -30,3 +35,4 @@ std::vector<Cube_Info> Total_Cube;								// 전체 큐브 정보
 std::vector<SOCKET> socket_Cube_vector;							// 각 쓰레드에서 얻은 소켓 정보(TCP, Cube)
 
 std::vector<SOCKET> socket_SendPlayerData_vector;
+std::vector<SOCKET> socket_RecvLookVector;
