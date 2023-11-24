@@ -4,6 +4,11 @@
 #include "ClientKeyInput.h"
 #include "ProcessClientInput.h"
 
+// Timer 관련
+#include <Mmsystem.h>
+#pragma comment(lib, "winmm.lib")
+
+
 
 
 // 함수
@@ -29,6 +34,9 @@ bool Check_Add_Cube(Cube_Info cube);
 // 윈속 변수
 WSADATA wsa;
 
+// ElapsedTime 관련
+DWORD g_startTime;
+DWORD g_prevTime;
 
 int main(int argc, char *argv[])
 {
@@ -154,7 +162,7 @@ int main(int argc, char *argv[])
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 
-			//ProcessClientInput();
+			
 		}
 
 		SendPlayerLocationToAllClient();
@@ -212,17 +220,9 @@ void InitGame()
 		Player_Info[i].fPosition_y = -50.0f;
 		Player_Info[i].fPosition_z = 0.0f;
 	}
-	//DWORD DeltaSeconds = 0;
-	//DWORD CurrentTime = timeGetTime();
-	//if (g_prevTime == 0)
-	//{
-	//	DeltaSeconds = CurrentTime - g_startTime;
-	//}
-	//else
-	//{
-	//	DeltaSeconds = CurrentTime - g_prevTime;
-	//}
-	//g_prevTime = CurrentTime;
+	
+
+	g_startTime = g_prevTime = 0;
 
 
 
@@ -306,10 +306,19 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 	while (1)
 	{
 		Sleep(30);
-		Player_Info[0].fPosition_y += 0.05;
-		Player_Info[1].fPosition_x -=0.05;
-		Player_Info[2].fPosition_x +=0.05;
-		Player_Info[2].fPosition_y +=0.05;
+
+		// ElapsedTime 계산
+		DWORD ElapsedTime = 0;
+		DWORD CurrentTime = timeGetTime();
+		if (g_prevTime == 0) ElapsedTime = CurrentTime - g_startTime;
+		else ElapsedTime = CurrentTime - g_prevTime;
+		g_prevTime = CurrentTime;
+		float ElapsedTimeInSec = (float)ElapsedTime / 1000.0f;
+
+		//플레이어 이동로직 
+		ProcessClientInput(ElapsedTimeInSec);
+
+		//플레이어 정보 모두 전송
 		for (auto p = socket_SendPlayerData_vector.begin(); p != socket_SendPlayerData_vector.end(); ++p) {
 			retval = send(*p, (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
 			if (retval == SOCKET_ERROR) {

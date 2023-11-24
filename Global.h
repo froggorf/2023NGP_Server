@@ -11,5 +11,3 @@
 
 #define MAXPLAYERCOUNT 3		
 
-//DWORD g_startTime;
-//DWORD g_prevTime;

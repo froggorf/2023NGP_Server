@@ -7,7 +7,7 @@
 
 
 // 구조체
-struct Player_Info{
+extern struct Player_Info{
 	float fPosition_x, fPosition_y, fPosition_z;
 	float fLook_x, fLook_z;
 };
@@ -19,11 +19,11 @@ struct Cube_Info {
 
 // 변수
 //int Cube_num = 0;												// 설치된 큐브 개수
-int Current_Player_Count{};										// 접속한 플레이어 인원 수 
+int Current_Player_Count;										// 접속한 플레이어 인원 수 
 struct sockaddr_in clientAddr[MAXPLAYERCOUNT];					// 클라이언트 주소 정보
 
 //std::vector<Player_Info*> Player_Info;							// 플레이어 정보
-struct Player_Info Player_Info[MAXPLAYERCOUNT];
+extern struct Player_Info Player_Info[MAXPLAYERCOUNT];
 
 std::vector<SOCKET> socket_vector;								// 각 쓰레드에서 얻은 소켓 정보(TCP, time)
 std::vector<Cube_Info> Total_Cube;								// 전체 큐브 정보
