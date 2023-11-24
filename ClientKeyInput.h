@@ -8,4 +8,5 @@ struct KeyInput
 	int PlayerNumber;
 };
 
-static UCHAR clientKeyBuffer[3][256];
+bool GetKeyBuffer(int PlayerNumber, int key);
+void SetKeyBuffer(int PlayerNumber, int key, bool bSet);

@@ -219,7 +219,11 @@ void InitGame()
 		Player_Info[i].fPosition_x = 0.0f;
 		Player_Info[i].fPosition_y = -50.0f;
 		Player_Info[i].fPosition_z = 0.0f;
+
+		Player_Info[i].fLook_x = 0.0f;
+		Player_Info[i].fLook_z = 1.0f;
 	}
+
 	
 
 	g_startTime = g_prevTime = 0;
@@ -247,7 +251,6 @@ void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
 	if (hThread == NULL) {  closesocket(*client_sock); }
 	else { CloseHandle(hThread); }
 }
-
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 {
 	printf("키 인풋 쓰레드 시작\n");
@@ -263,16 +266,21 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 			printf("?\n");
 			break;
 		}
+		if(!clientKeyInput.KeyDown && (clientKeyInput.Key==27||clientKeyInput.Key==0))
+		{
+			//종료한 상황으로 확인됨
+			closesocket(*ClientKeyInputSocket);
+			break;
+		}
 		printf("%d 플레이어가 %d 버튼 ", clientKeyInput.PlayerNumber, clientKeyInput.Key);
 		if(clientKeyInput.KeyDown)
 		{
-			clientKeyBuffer[clientKeyInput.PlayerNumber][clientKeyInput.Key] = true;
+			SetKeyBuffer(clientKeyInput.PlayerNumber, clientKeyInput.Key, true);
 			printf("누름\n");
-
 
 		}else
 		{
-			clientKeyBuffer[clientKeyInput.PlayerNumber][clientKeyInput.Key] = false;
+			SetKeyBuffer(clientKeyInput.PlayerNumber, clientKeyInput.Key, false);
 			printf("뗌\n");
 		}
 	}
@@ -322,7 +330,9 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		for (auto p = socket_SendPlayerData_vector.begin(); p != socket_SendPlayerData_vector.end(); ++p) {
 			retval = send(*p, (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
 			if (retval == SOCKET_ERROR) {
-				printf("에러!\n");
+				printf("종료된 것으로 확인됨\n");
+				closesocket(*p);
+				socket_SendPlayerData_vector.erase(p);
 				break;
 			}
 		}

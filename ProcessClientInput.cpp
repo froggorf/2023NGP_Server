@@ -13,10 +13,6 @@
 #define DIRECT_DOWN 0x20
 
 
-#define VK_W 0x57
-#define VK_A 0x41
-#define VK_S 0x53
-#define VK_D 0x44
 
 struct Player_Info {
 	float fPosition_x, fPosition_y, fPosition_z;
@@ -28,31 +24,25 @@ void ProcessClientInput(float ElapsedTime)
 {
 	for (int i = 0; i < MAXPLAYERCOUNT; ++i) {
 		DWORD dwDirection = 0;
-	
-		if (clientKeyBuffer[i][VK_W] & 0xF0) {
+		if (GetKeyBuffer(i, VK_W)) {
 			dwDirection |= DIRECT_FORWARD;
 		}
-		if (clientKeyBuffer[i][VK_S] & 0xF0) {
+		if (GetKeyBuffer(i, VK_S)) {
 			dwDirection |= DIRECT_BACKWARD;
 		}
-		if (clientKeyBuffer[i][VK_A] & 0xF0) {
+		if (GetKeyBuffer(i, VK_A)) {
 			dwDirection |= DIRECT_LEFT;
 		}
-		if (clientKeyBuffer[i][VK_D] & 0xF0) {
+		if (GetKeyBuffer(i, VK_D)) {
 			dwDirection |= DIRECT_RIGHT;
 		}
-		if (clientKeyBuffer[i][VK_SPACE] & 0xF0) {
+		if (GetKeyBuffer(i, VK_SPACE)) {
 			dwDirection |= DIRECT_UP;
 		}
-		if (clientKeyBuffer[i][VK_LSHIFT] & 0xF0) {
+		if (GetKeyBuffer(i, VK_LSHIFT)) {
 			dwDirection |= DIRECT_DOWN;
 		}
-
-		static int a = 3;
-		a += 1;
-		if (i == 0 && a%10==0) {
-			printf("%d 번째 플레이어 %d의 움직임\n", i, dwDirection);
-		}
+		
 		
 		if (dwDirection != 0) {
 			PlayerMove(i, dwDirection, PLAYER_MOVE_DISTANCE * ElapsedTime, false);
