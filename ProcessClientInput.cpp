@@ -42,9 +42,9 @@ void ProcessClientInput()
 			dwDirection |= DIRECT_DOWN;
 		}
 		
-		if (dwDirection) {
-			PlayerMove(i, dwDirection,)
-		}
+		//if (dwDirection != 0) {
+		//	PlayerMove(i, dwDirection,)
+		//}
 
 
 	}

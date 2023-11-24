@@ -28,3 +28,5 @@ struct Player_Info Player_Info[MAXPLAYERCOUNT];
 std::vector<SOCKET> socket_vector;								// 각 쓰레드에서 얻은 소켓 정보(TCP, time)
 std::vector<Cube_Info> Total_Cube;								// 전체 큐브 정보
 std::vector<SOCKET> socket_Cube_vector;							// 각 쓰레드에서 얻은 소켓 정보(TCP, Cube)
+
+std::vector<SOCKET> socket_SendPlayerData_vector;

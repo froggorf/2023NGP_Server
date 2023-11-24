@@ -116,7 +116,11 @@ int main(int argc, char *argv[])
 	//-----------------
 	// 게임 데이터 초기화
 	InitGame();
-
+	
+	//플레이어 데이터 전송 쓰레드 미리 실행시키기
+	HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
+		(LPVOID)0, 0, NULL);
+	CloseHandle(hThread);
 
 	// 플레이어 지정한 수 인원 접속시키기
 	while (Current_Player_Count != MAXPLAYERCOUNT) {
@@ -216,6 +220,18 @@ void InitGame()
 		Player_Info[i].fPosition_y = -50.0f;
 		Player_Info[i].fPosition_z = 0.0f;
 	}
+	//DWORD DeltaSeconds = 0;
+	//DWORD CurrentTime = timeGetTime();
+	//if (g_prevTime == 0)
+	//{
+	//	DeltaSeconds = CurrentTime - g_startTime;
+	//}
+	//else
+	//{
+	//	DeltaSeconds = CurrentTime - g_prevTime;
+	//}
+	//g_prevTime = CurrentTime;
+
 
 
 	Total_Cube.clear();
@@ -283,20 +299,16 @@ void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
 		err_display("CreateSendPlayerDataThread() - accept()");
 		return;
 	}
+	socket_SendPlayerData_vector.push_back(client_sock);
 
-	HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
-		(LPVOID)client_sock, 0, NULL);
-	if (hThread == NULL) { closesocket(client_sock); }
-	else { CloseHandle(hThread); }
+
 }
 
 DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 {
 	printf("플레이어 정보 전송 시작\n");
-	SOCKET SendPlayerDataSocket = (SOCKET)arg;
-	struct sockaddr_in clientaddr;
-
-	
+	//SOCKET SendPlayerDataSocket = (SOCKET)arg;
+	//struct sockaddr_in clientaddr;
 	
 	int retval;
 	while (1)
@@ -306,12 +318,13 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		Player_Info[1].fPosition_x -=0.05;
 		Player_Info[2].fPosition_x +=0.05;
 		Player_Info[2].fPosition_y +=0.05;
-		retval = send(SendPlayerDataSocket, (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
-		if (retval == SOCKET_ERROR ) {
-			printf("?\n");
-			break;
+		for (auto p = socket_SendPlayerData_vector.begin(); p != socket_SendPlayerData_vector.end(); ++p) {
+			retval = send(*p, (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
+			if (retval == SOCKET_ERROR) {
+				printf("에러!\n");
+				break;
+			}
 		}
-		
 	}
 	return 0;
 }

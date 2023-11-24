@@ -29,10 +29,10 @@
     <ClInclude Include="ServerData.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="ClientKeyInput.h">
+    <ClInclude Include="ProcessClientInput.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="ProcessClientInput.h">
+    <ClInclude Include="ClientKeyInput.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
