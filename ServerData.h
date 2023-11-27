@@ -15,6 +15,7 @@ extern struct Player_Info{
 struct Cube_Info {
 	float fPosition_x, fPosition_y, fPosition_z;
 	float fColor_r, fColor_g, fColor_b;
+	bool AddorDelete;
 };
 
 struct Look_Data

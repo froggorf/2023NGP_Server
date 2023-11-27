@@ -450,27 +450,44 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 		}
 		printf("Cube Position - %.2f, %.2f, %.2f\n", clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
 		printf("Cube Color - %.2f, %.2f, %.2f\n", clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b);
-
-		// 여기서 큐브와 사람 충돌체크
-		if (Check_Add_Cube(clientCubeInput))
+		printf("Cube Add or Delete - %s\n", clientCubeInput.AddorDelete ? "Add" : "Delete");
+		
+		// Cube Add
+		if (clientCubeInput.AddorDelete)	
 		{
-			printf("큐브 설치 불가능\n");
+			// 여기서 큐브와 사람 충돌체크
+			if (Check_Add_Cube(clientCubeInput))
+			{
+				printf("큐브 설치 불가능\n");
+			}
+			// 가능시에만 각 클라에게 큐브 정보 send
+			else
+			{
+				printf("큐브 설치 가능\n");
+				// 큐브 send to every client
+				for (auto i : socket_Cube_vector) {
+					int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+					if (retval == SOCKET_ERROR) {
+						err_display("send()");
+						break;
+					}
+					std::cout << "Sending Add cube_info to the client" << std::endl;
+				}
+			}
 		}
-		// 가능시에만 각 클라에게 큐브 정보 send
-		else 
+		// Cube Delete
+		else
 		{
-			printf("큐브 설치 가능\n");
-			// 큐브 send to every client
+			printf("큐브 삭제 가능\n");
 			for (auto i : socket_Cube_vector) {
 				int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
 				if (retval == SOCKET_ERROR) {
 					err_display("send()");
 					break;
 				}
-				std::cout << "Sending cube_info to the client" << std::endl;
+				std::cout << "Sending Delete cube_info to the client" << std::endl;
 			}
 		}
-		
 	}
 	return 0;
 }
