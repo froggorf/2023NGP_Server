@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <vector>
+#include <algorithm>
 #include <time.h>
 #include <chrono>
 
@@ -25,7 +26,7 @@ struct Look_Data
 };
 // 변수
 //int Cube_num = 0;												// 설치된 큐브 개수
-int Current_Player_Count;										// 접속한 플레이어 인원 수 
+int Current_Player_Count = 0;										// 접속한 플레이어 인원 수 
 struct sockaddr_in clientAddr[MAXPLAYERCOUNT];					// 클라이언트 주소 정보
 
 //std::vector<Player_Info*> Player_Info;							// 플레이어 정보

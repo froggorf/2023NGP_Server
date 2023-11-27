@@ -36,6 +36,8 @@ void CreateCubeThread(SOCKET& Cube_listen_sock);
 DWORD WINAPI EchoClientRequestCube(LPVOID arg);
 bool Check_Add_Cube(Cube_Info cube);
 
+bool CompareXMFLOAT3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b);
+
 // 윈속 변수
 WSADATA wsa;
 
@@ -464,6 +466,8 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 			else
 			{
 				printf("큐브 설치 가능\n");
+				// add to Total_Cube
+				Total_Cube.push_back(clientCubeInput);
 				// 큐브 send to every client
 				for (auto i : socket_Cube_vector) {
 					int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
@@ -478,14 +482,29 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 		// Cube Delete
 		else
 		{
-			printf("큐브 삭제 가능\n");
-			for (auto i : socket_Cube_vector) {
-				int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
-				if (retval == SOCKET_ERROR) {
-					err_display("send()");
-					break;
+			auto it = std::find_if(Total_Cube.begin(), Total_Cube.end(), [&](const Cube_Info& value) {
+				return CompareXMFLOAT3(DirectX::XMFLOAT3(value.fPosition_x, value.fPosition_y, value.fPosition_z),
+				DirectX::XMFLOAT3(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z));
+				});
+
+			if (it != Total_Cube.end()) 
+			{
+				// 큐브 값은 찾은 경우
+				printf("큐브 삭제 가능\n");
+				Total_Cube.erase(it);
+
+				for (auto i : socket_Cube_vector) {
+					int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+					if (retval == SOCKET_ERROR) {
+						err_display("send()");
+						break;
+					}
+					std::cout << "Sending Delete cube_info to the client" << std::endl;
 				}
-				std::cout << "Sending Delete cube_info to the client" << std::endl;
+			}
+			else {
+				// 큐브 값을 찾지 못한 경우
+				std::cout << "Delete Cube Value not found!" << std::endl;
 			}
 		}
 	}
@@ -549,4 +568,8 @@ bool Check_Add_Cube(Cube_Info cube)
 	}
 }
 
+
+bool CompareXMFLOAT3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b) {
+	return (a.x == b.x && a.y == b.y && a.z == b.z);
+}
 
