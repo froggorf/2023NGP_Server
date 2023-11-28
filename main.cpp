@@ -344,7 +344,6 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 	while (1)
 	{
 		Sleep(30);
-
 		// ElapsedTime °è»ê
 		DWORD ElapsedTime = 0;
 		DWORD CurrentTime = timeGetTime();
