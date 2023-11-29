@@ -427,6 +427,13 @@ void CreateCubeThread(SOCKET& Cube_listen_sock)
 		return;
 	}
 	socket_Cube_vector.push_back(client_sock);
+
+	// 현재 맵에 놓여있는 모든 큐브 정보 전송
+	for(const auto cube : Total_Cube)
+	{
+		send(client_sock, (char*)&cube, sizeof(cube), 0);
+	}
+
 	HANDLE hThread = CreateThread(NULL, 0, EchoClientRequestCube,
 		(LPVOID)client_sock, 0, NULL);
 	if (hThread == NULL) { closesocket(client_sock); }
