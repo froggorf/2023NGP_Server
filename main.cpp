@@ -3,6 +3,7 @@
 #include "ServerData.h"
 #include "ClientKeyInput.h"
 #include "ProcessClientInput.h"
+#include "array"
 
 // Timer 관련
 #include <Mmsystem.h>
@@ -18,7 +19,7 @@ void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock);
 VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime); 	// 시간 업데이트 함수
 void Send_Game_Time();
 void SendPlayerLocationToAllClient();
-int remainingSeconds = MAX_MIN * 60; // 5분을 초로 환산
+int remainingSeconds = GAMETIME; // 5분을 초로 환산
 
 // 키 인풋 받아 처리하는 쓰레드
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg);
@@ -168,7 +169,6 @@ int main(int argc, char *argv[])
 		CreateSendPlayerDataThread(send_playerdata_listen_sock);
 		CreateRecvLookVectorThread(recv_LookVector_listen_sock);
 	}
-
 	// 소켓 닫기
 	closesocket(login_listen_sock);
 
@@ -197,6 +197,9 @@ int main(int argc, char *argv[])
 
 		SendPlayerLocationToAllClient();
 	}
+
+
+	// TODO: EndGame() 로직 만들기.
 
 	// 소켓 닫기
 	//closesocket(listen_sock);
@@ -528,7 +531,22 @@ VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
 	}
 	else {
 		// 게임 종료 이벤트 여기에 추가
-		
+		std::array<int, MAXPLAYERCOUNT> player_cube_count;
+		for(const auto cube: Total_Cube)
+		{
+			if (cube.fColor_r - 1.0f < FLT_EPSILON) ++player_cube_count[0];
+			if (cube.fColor_g - 1.0f < FLT_EPSILON) ++player_cube_count[1];
+			if (cube.fColor_b - 1.0f < FLT_EPSILON) ++player_cube_count[2];
+		}
+		for(const auto client_sock : socket_vector)
+		{
+			int retval = send(client_sock, (char*)&player_cube_count, sizeof(int) * MAXPLAYERCOUNT, 0);
+			if(retval==SOCKET_ERROR)
+			{
+				err_display("game end send()");
+				break;
+			}
+		}
 		// 타이머 종료
 		KillTimer(hwnd, TIMER_ID);
 		for (auto i : socket_vector)	closesocket(i);		// 시간 소켓 close
