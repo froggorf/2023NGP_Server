@@ -28,9 +28,6 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg);
 void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock);
 DWORD WINAPI SendPlayerDataToClient(LPVOID arg);
 
-// 플레이어 룩벡터 전송받는 쓰레드
-void CreateRecvLookVectorThread(SOCKET& recv_lookvector_listen_sock);
-DWORD WINAPI RecvLookVectorFromClient(LPVOID arg);
 
 
 void CreateCubeThread(SOCKET& Cube_listen_sock);
@@ -157,9 +154,6 @@ int main(int argc, char *argv[])
 	HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
 		(LPVOID)0, 0, NULL);
 	CloseHandle(hThread);
-	hThread = CreateThread(NULL, 0, RecvLookVectorFromClient,
-		(LPVOID)0, 0, NULL);
-	CloseHandle(hThread);
 
 	// 플레이어 지정한 수 인원 접속시키기
 	while (Current_Player_Count != MAXPLAYERCOUNT) {
@@ -167,7 +161,6 @@ int main(int argc, char *argv[])
 		CreateClientKeyInputThread(KeyInput_listen_sock);
 		CreateCubeThread(Cube_listen_sock);
 		CreateSendPlayerDataThread(send_playerdata_listen_sock);
-		CreateRecvLookVectorThread(recv_LookVector_listen_sock);
 	}
 	// 소켓 닫기
 	closesocket(login_listen_sock);
@@ -339,14 +332,30 @@ void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
 
 DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 {
-	printf("플레이어 정보 전송 시작\n");
+	printf("플레이어 정보 전송 및 룩벡터 받기 시작\n");
 	//SOCKET SendPlayerDataSocket = (SOCKET)arg;
 	//struct sockaddr_in clientaddr;
 
 	int retval;
+	struct Look_Data data;
 	while (1)
 	{
-		Sleep(30);
+		Sleep(16);
+		int size = socket_SendPlayerData_vector.size();
+		for (int i = 0; i < size; ++i) {
+
+			retval = recv(socket_SendPlayerData_vector[i], (char*)&data, sizeof(struct Look_Data), MSG_WAITALL);
+			if (retval == SOCKET_ERROR)
+			{
+				printf("종료된 것으로 확인됨\n");
+				closesocket(socket_SendPlayerData_vector[i]);
+				socket_SendPlayerData_vector.erase(socket_SendPlayerData_vector.begin() + i);
+				break;
+			}
+			Player_Info[data.PlayerNumber].fLook_x = data.fLook_x;
+			Player_Info[data.PlayerNumber].fLook_z = data.fLook_z;
+		}
+
 		// ElapsedTime 계산
 		DWORD ElapsedTime = 0;
 		DWORD CurrentTime = timeGetTime();
@@ -385,33 +394,6 @@ void CreateRecvLookVectorThread(SOCKET& recv_lookvector_listen_sock)
 		return;
 	}
 	socket_RecvLookVector.push_back(client_sock);
-}
-
-DWORD WINAPI RecvLookVectorFromClient(LPVOID arg)
-{
-	printf("룩벡터 전송받기 시작\n");
-
-	int retval;
-	struct Look_Data data;
-	while (1)
-	{
-		//플레이어 정보 모두 전송
-		int size = socket_RecvLookVector.size();
-		for (int i = 0; i < size; ++i) {
-			
-			retval = recv(socket_RecvLookVector[i], (char*)&data, sizeof(struct Look_Data), MSG_WAITALL);
-			if(retval == SOCKET_ERROR)
-			{
-				printf("종료된 것으로 확인됨\n");
-				closesocket(socket_RecvLookVector[i]);
-				socket_RecvLookVector.erase(socket_RecvLookVector.begin()+i);
-				break;
-			}
-			Player_Info[data.PlayerNumber].fLook_x = data.fLook_x;
-			Player_Info[data.PlayerNumber].fLook_z = data.fLook_z;
-		}
-	}
-	return 0;
 }
 
 
