@@ -28,7 +28,9 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg);
 void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock);
 DWORD WINAPI SendPlayerDataToClient(LPVOID arg);
 
-
+// 채팅 서버 생성 쓰레드
+void CreateChatThread(SOCKET& chat_listen_sock);
+DWORD WINAPI ProcessEchoChat(LPVOID arg);
 
 void CreateCubeThread(SOCKET& Cube_listen_sock);
 DWORD WINAPI EchoClientRequestCube(LPVOID arg);
@@ -127,23 +129,23 @@ int main(int argc, char *argv[])
 	if (listen(send_playerdata_listen_sock, SOMAXCONN)
 		== SOCKET_ERROR) err_quit("listen()");
 
-	//---------------- 소켓 만드는 과정(플레이어 데이터 전송 소켓)----------------
-	// 소켓 생성(플레이어 데이터 전송 소켓)
-	SOCKET recv_LookVector_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (recv_LookVector_listen_sock == INVALID_SOCKET) err_quit("socket()");
+	//---------------- 소켓 만드는 과정(채팅 소켓)----------------
+	// 소켓 생성(채팅 소켓)
+	SOCKET echo_chat_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (echo_chat_listen_sock == INVALID_SOCKET) err_quit("socket()");
 
 	// bind()
-	struct sockaddr_in serveraddr_recvLookVector;
-	memset(&serveraddr_recvLookVector, 0, sizeof(serveraddr_recvLookVector));
-	serveraddr_recvLookVector.sin_family = AF_INET;
-	serveraddr_recvLookVector.sin_addr.s_addr = htonl(INADDR_ANY);
-	serveraddr_recvLookVector.sin_port = htons(RECVLOOKVECTORPORT);
+	struct sockaddr_in serveraddr_chat;
+	memset(&serveraddr_chat, 0, sizeof(serveraddr_chat));
+	serveraddr_chat.sin_family = AF_INET;
+	serveraddr_chat.sin_addr.s_addr = htonl(INADDR_ANY);
+	serveraddr_chat.sin_port = htons(ECHOCHATDATAPORT);
 
-	if (bind(recv_LookVector_listen_sock, (struct sockaddr*)&serveraddr_recvLookVector, sizeof(serveraddr_recvLookVector))
+	if (bind(echo_chat_listen_sock, (struct sockaddr*)&serveraddr_chat, sizeof(serveraddr_chat))
 		== SOCKET_ERROR) err_quit("bind()");
 
 	// listen()
-	if (listen(recv_LookVector_listen_sock, SOMAXCONN)
+	if (listen(echo_chat_listen_sock, SOMAXCONN)
 		== SOCKET_ERROR) err_quit("listen()");
 
 	//-----------------
@@ -161,6 +163,7 @@ int main(int argc, char *argv[])
 		CreateClientKeyInputThread(KeyInput_listen_sock);
 		CreateCubeThread(Cube_listen_sock);
 		CreateSendPlayerDataThread(send_playerdata_listen_sock);
+		CreateChatThread(echo_chat_listen_sock);
 	}
 	// 소켓 닫기
 	closesocket(login_listen_sock);
@@ -261,33 +264,33 @@ void InitGame()
 
 void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
 {
-	SOCKET* client_sock = new SOCKET();
+	SOCKET client_sock;
 	struct sockaddr_in clientaddr;
 
 	// accept()
 	int addrlen = sizeof(clientaddr);
-	*client_sock = accept(KeyInput_listen_sock, (struct sockaddr*)&clientaddr, &addrlen);
-	if (*client_sock == INVALID_SOCKET) {
+	client_sock = accept(KeyInput_listen_sock, (struct sockaddr*)&clientaddr, &addrlen);
+	if (client_sock == INVALID_SOCKET) {
 		err_display("CreateClientKeyInputThread() - accept()");
 		return;
 	}
 
 	HANDLE hThread = CreateThread(NULL, 0, ProcessClientKeyInput,
 		(LPVOID)client_sock, 0, NULL);
-	if (hThread == NULL) {  closesocket(*client_sock); }
+	if (hThread == NULL) {  closesocket(client_sock); }
 	else { CloseHandle(hThread); }
 }
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 {
 	printf("키 인풋 쓰레드 시작\n");
-	SOCKET* ClientKeyInputSocket = (SOCKET*)arg;
+	SOCKET ClientKeyInputSocket = (SOCKET)arg;
 	struct sockaddr_in clientaddr;
 
 	struct KeyInput clientKeyInput{};
 	int retval;
 	while(1)
 	{
-		retval = recv(*ClientKeyInputSocket, (char*)&clientKeyInput, sizeof(clientKeyInput), 0);
+		retval = recv(ClientKeyInputSocket, (char*)&clientKeyInput, sizeof(clientKeyInput), 0);
 		if (retval == SOCKET_ERROR||(clientKeyInput.Key<0 || clientKeyInput.Key>256)) {
 			printf("?\n");
 			break;
@@ -295,7 +298,7 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 		if(!clientKeyInput.KeyDown && (clientKeyInput.Key==27||clientKeyInput.Key==0))
 		{
 			//종료한 상황으로 확인됨
-			closesocket(*ClientKeyInputSocket);
+			closesocket(ClientKeyInputSocket);
 			break;
 		}
 		printf("%d 플레이어가 %d 버튼 ", clientKeyInput.PlayerNumber, clientKeyInput.Key);
@@ -312,7 +315,51 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 	}
 	return 0;
 }
+void CreateChatThread(SOCKET& chat_listen_sock)
+{
+	SOCKET client_sock;
+	struct sockaddr_in clientaddr;
 
+	// accept()
+	int addrlen = sizeof(clientaddr);
+	client_sock = accept(chat_listen_sock, (struct sockaddr*)&clientaddr, &addrlen);
+	if (client_sock == INVALID_SOCKET) {
+		err_display("CreateClientKeyInputThread() - accept()");
+		return;
+	}
+
+	socket_chat_vector.push_back(client_sock);
+
+	HANDLE hThread = CreateThread(NULL, 0, ProcessEchoChat,
+		(LPVOID)client_sock, 0, NULL);
+	if (hThread == NULL) { closesocket(client_sock); }
+	else { CloseHandle(hThread); }
+}
+DWORD WINAPI ProcessEchoChat(LPVOID arg)
+{
+	printf("채팅 쓰레드 시작\n");
+	SOCKET echo_chat_socket = (SOCKET)arg;
+	struct sockaddr_in clientaddr;
+
+	ChatString chat_string;
+	int retval;
+	while (1)
+	{
+		retval = recv(echo_chat_socket, (char*)&chat_string, sizeof(ChatString), 0);
+		if (retval == SOCKET_ERROR) {
+			printf("?\n");
+			break;
+		}
+		printf("%d 플레이어 : %s 채팅 보냄\n",chat_string.playerNumber, chat_string.chatData.c_str());
+
+		int size = socket_chat_vector.size();
+		for(int i =0; i<size; ++i)
+		{
+			send(socket_chat_vector[i], (char*)&chat_string, sizeof(ChatString), 0);
+		}
+	}
+	return 0;
+}
 void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
 {
 	SOCKET client_sock;
@@ -363,7 +410,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		else ElapsedTime = CurrentTime - g_prevTime;
 		g_prevTime = CurrentTime;
 		float ElapsedTimeInSec = (float)ElapsedTime / 1000.0f;
-
+		
 		//플레이어 이동로직 
 		ProcessClientInput(ElapsedTimeInSec);
 
@@ -379,21 +426,6 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		}
 	}
 	return 0;
-}
-
-void CreateRecvLookVectorThread(SOCKET& recv_lookvector_listen_sock)
-{
-	SOCKET client_sock;
-	struct sockaddr_in clientaddr;
-
-	// accept()
-	int addrlen = sizeof(clientaddr);
-	client_sock = accept(recv_lookvector_listen_sock, (struct sockaddr*)&clientaddr, &addrlen);
-	if (client_sock == INVALID_SOCKET) {
-		err_display("CreateRecvLookVectorThread() - accept()");
-		return;
-	}
-	socket_RecvLookVector.push_back(client_sock);
 }
 
 
