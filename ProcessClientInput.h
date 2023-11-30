@@ -1,5 +1,9 @@
 #pragma once
 #include <DirectXMath.h>
+#include <d3d12.h>
+#include <DirectXCollision.h>
+#include <vector>
+
 
 #define PLAYER_MOVE_DISTANCE 100.0f
 
@@ -106,4 +110,86 @@ namespace Vector3 {
 	}
 
 	
+}
+
+
+namespace Vector4 {
+	inline DirectX::XMFLOAT4 Add(DirectX::XMFLOAT4& xmf4_Vector1, DirectX::XMFLOAT4& xmf4_Vector2) {	// float4 + float4
+		DirectX::XMFLOAT4 xmf4_Result;
+		DirectX::XMStoreFloat4(&xmf4_Result, DirectX::XMVectorAdd(DirectX::XMLoadFloat4(&xmf4_Vector1), DirectX::XMLoadFloat4(&xmf4_Vector2)));
+
+		return xmf4_Result;
+	}
+
+	inline DirectX::XMFLOAT4 Multiply(DirectX::XMFLOAT4& xmf4_Vector1, DirectX::XMFLOAT4& xmf4_Vector2) {	// float4 * float4
+		DirectX::XMFLOAT4 xmf4_Result;
+		DirectX::XMStoreFloat4(&xmf4_Result, DirectX::XMVectorMultiply(DirectX::XMLoadFloat4(&xmf4_Vector1), DirectX::XMLoadFloat4(&xmf4_Vector2)));
+
+		return xmf4_Result;
+	}
+
+	inline DirectX::XMFLOAT4 Multiply(DirectX::XMFLOAT4& xmf4_Vector, float fScalar) {	// float4 * float
+		DirectX::XMFLOAT4 xmf4_Result;
+		DirectX::XMStoreFloat4(&xmf4_Result, DirectX::XMVectorScale(DirectX::XMLoadFloat4(&xmf4_Vector), fScalar));
+
+		return xmf4_Result;
+	}
+}
+
+namespace Matrix4x4 {
+	inline DirectX::XMFLOAT4X4 Identity() {
+		DirectX::XMFLOAT4X4 xmf4x4Result;
+		DirectX::XMStoreFloat4x4(&xmf4x4Result, DirectX::XMMatrixIdentity());
+
+		return xmf4x4Result;
+	}
+
+	inline DirectX::XMFLOAT4X4 Multiply(DirectX::XMFLOAT4X4& xmmtx4x4_Matrix1, DirectX::XMFLOAT4X4& xmmtx4x4_Matrix2) {
+		DirectX::XMFLOAT4X4 xmf4x4Result;
+		DirectX::XMStoreFloat4x4(&xmf4x4Result, DirectX::XMMatrixMultiply(DirectX::XMLoadFloat4x4(&xmmtx4x4_Matrix1), DirectX::XMLoadFloat4x4(&xmmtx4x4_Matrix2)));
+
+		return xmf4x4Result;
+	}
+
+	inline DirectX::XMFLOAT4X4 Multiply(DirectX::XMFLOAT4X4& xmmtx4x4_Matrix1, DirectX::XMMATRIX& xmmtx_Matrix2) {
+		DirectX::XMFLOAT4X4 xmf4x4Result;
+		DirectX::XMStoreFloat4x4(&xmf4x4Result, DirectX::XMMatrixMultiply(DirectX::XMLoadFloat4x4(&xmmtx4x4_Matrix1), xmmtx_Matrix2));
+
+		return xmf4x4Result;
+	}
+
+	inline DirectX::XMFLOAT4X4 Multiply(DirectX::XMMATRIX& xmmtx_Matrix1, DirectX::XMFLOAT4X4& xmmtx4x4_Matrix2) {
+		DirectX::XMFLOAT4X4 xmf4x4Result;
+		DirectX::XMStoreFloat4x4(&xmf4x4Result, DirectX::XMMatrixMultiply(xmmtx_Matrix1, DirectX::XMLoadFloat4x4(&xmmtx4x4_Matrix2)));
+
+		return xmf4x4Result;
+	}
+
+	inline DirectX::XMFLOAT4X4 Inverse(DirectX::XMFLOAT4X4& xmmtx4x4_Matrix) {	// Inverse
+		DirectX::XMFLOAT4X4 xmf4x4Result;
+		DirectX::XMStoreFloat4x4(&xmf4x4Result, DirectX::XMMatrixInverse(NULL, DirectX::XMLoadFloat4x4(&xmmtx4x4_Matrix)));
+
+		return xmf4x4Result;
+	}
+
+	inline DirectX::XMFLOAT4X4 Transpose(DirectX::XMFLOAT4X4& xmmtx4x4_Matrix) {	// Transpose
+		DirectX::XMFLOAT4X4 xmf4x4Result;
+		DirectX::XMStoreFloat4x4(&xmf4x4Result, DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&xmmtx4x4_Matrix)));
+
+		return xmf4x4Result;
+	}
+
+	inline DirectX::XMFLOAT4X4 PerspectiveFov_LH(float FovAngle_Y, float Aspect_Ratio, float Near_Z, float Far_Z) {	// Projection Matrix
+		DirectX::XMFLOAT4X4 xmf4x4Result;
+		DirectX::XMStoreFloat4x4(&xmf4x4Result, DirectX::XMMatrixPerspectiveFovLH(FovAngle_Y, Aspect_Ratio, Near_Z, Far_Z));
+
+		return xmf4x4Result;
+	}
+
+	inline DirectX::XMFLOAT4X4 LookAt_LH(DirectX::XMFLOAT3& xmf3_Eye_Position, DirectX::XMFLOAT3& xmf3_LookAt_Position, DirectX::XMFLOAT3& xmf3_Up_Direction) {	// View Matrix
+		DirectX::XMFLOAT4X4 xmf4x4Result;
+		DirectX::XMStoreFloat4x4(&xmf4x4Result, DirectX::XMMatrixLookAtLH(DirectX::XMLoadFloat3(&xmf3_Eye_Position), DirectX::XMLoadFloat3(&xmf3_LookAt_Position), DirectX::XMLoadFloat3(&xmf3_Up_Direction)));
+
+		return xmf4x4Result;
+	}
 }

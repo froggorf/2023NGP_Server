@@ -4,6 +4,7 @@ bool clientKeyBuffer[3][256];
 
 bool GetKeyBuffer(int PlayerNumber, int key)
 {
+    
     return clientKeyBuffer[PlayerNumber][key];
 }
 

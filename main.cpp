@@ -45,9 +45,27 @@ WSADATA wsa;
 DWORD g_startTime;
 DWORD g_prevTime;
 
+
+
 int main(int argc, char *argv[])
 {
 	int retval;
+
+	nObjects = (CUBE_INIT_RING_NUMBER * 2 + 1) * (CUBE_INIT_RING_NUMBER * 2 + 1);
+	ppObjects = new CObject * [CUBE_MAX_NUMBER] { NULL };
+
+	int c_i = 0;
+	CObject* pObject = NULL;
+
+	for (int x = -CUBE_INIT_RING_NUMBER; x <= CUBE_INIT_RING_NUMBER; ++x) {
+		for (int z = -CUBE_INIT_RING_NUMBER; z <= CUBE_INIT_RING_NUMBER; ++z) {
+			pObject = new CObject();
+			pObject->Set_Position(CUBE_WIDTH * x, 0.0f, CUBE_WIDTH * z);
+			//pObject->Set_Color(CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, 0.0f);
+			ppObjects[c_i++] = pObject;
+		}
+	}
+
 
 	//----------------로그인 소켓 만드는 과정----------------   //TODO: 아래꺼랑 합쳐서 함수화 처리 예정
 	// 윈속 초기화
@@ -254,9 +272,10 @@ void InitGame()
 		Player_Info[i].fLook_z = 1.0f;
 	}
 
-	
 
-	g_startTime = g_prevTime = 0;
+
+	g_startTime = timeGetTime();
+	g_prevTime = 0;
 
 
 
@@ -354,7 +373,24 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		float ElapsedTimeInSec = (float)ElapsedTime / 1000.0f;
 
 		//플레이어 이동로직 
-		ProcessClientInput(ElapsedTimeInSec);
+		//ProcessClientInput(ElapsedTimeInSec);
+
+		//vPlayer[0].Set_Position(DirectX::XMFLOAT3(Player_Info[0].fPosition_x, Player_Info[0].fPosition_y, Player_Info[0].fPosition_z));
+		//std::cout << vPlayer->Get_Position().x << std::endl;
+		vPlayer[0].Set_Look_Vector(DirectX::XMFLOAT3(Player_Info[0].fLook_x, 0, Player_Info[0].fLook_z));
+		vPlayer[0].Set_Right_Vector(vPlayer[0].Get_Look_Vector());
+
+		vPlayer[0].Move(0, PLAYER_MOVE_DISTANCE * ElapsedTimeInSec, true);
+		vPlayer[0].Update(0, ElapsedTimeInSec);
+		vPlayer[0].Udt_N_Prcs_Collision(ppObjects, nObjects);
+
+		Player_Info[0].fPosition_x = vPlayer[0].Get_Position().x;
+		Player_Info[0].fPosition_y = vPlayer[0].Get_Position().y;
+		Player_Info[0].fPosition_z = vPlayer[0].Get_Position().z;
+
+		//printf("%f - %f - %f\n", Player_Info[0].fPosition_x, Player_Info[0].fPosition_y, Player_Info[0].fPosition_z);
+	
+		
 
 		//플레이어 정보 모두 전송
 		for (auto p = socket_SendPlayerData_vector.begin(); p != socket_SendPlayerData_vector.end(); ++p) {
@@ -468,6 +504,11 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 				printf("큐브 설치 가능\n");
 				// add to Total_Cube
 				Total_Cube.push_back(clientCubeInput);
+				// add to Cube Object
+				CObject* pObject = new CObject();
+				pObject->Set_Position(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
+				ppObjects[nObjects++] = pObject;
+
 				// 큐브 send to every client
 				for (auto i : socket_Cube_vector) {
 					int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
@@ -492,6 +533,26 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 				// 큐브 값은 찾은 경우
 				printf("큐브 삭제 가능\n");
 				Total_Cube.erase(it);
+
+				// delete to Cube Object
+				CObject* pSelected_Object = NULL;
+				int nSelected_Index = 0;
+				for (int i = 0; i < nObjects; ++i) {
+					if (CompareXMFLOAT3(ppObjects[i]->Get_Position(), DirectX::XMFLOAT3(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z)) )
+					{
+						pSelected_Object = ppObjects[i];
+						nSelected_Index = i;
+					}
+				}
+				if (pSelected_Object) 
+				{
+					ppObjects[nSelected_Index] = NULL;
+
+					if (nSelected_Index != nObjects - 1) {
+						ppObjects[nSelected_Index] = ppObjects[nObjects - 1];
+					}
+					--nObjects;
+				}
 
 				for (auto i : socket_Cube_vector) {
 					int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);

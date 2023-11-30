@@ -4,8 +4,13 @@
 #include <algorithm>
 #include <time.h>
 #include <chrono>
+#include "Player.h"
 
+CPlayer* vPlayer = new CPlayer[3];
 
+//CCube_Player* pCube_Player = new CCube_Player();
+CObject** ppObjects;
+int nObjects;
 
 // ±¸Á¶Ã¼
 extern struct Player_Info{

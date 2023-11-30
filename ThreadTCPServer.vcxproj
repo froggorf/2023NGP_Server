@@ -101,7 +101,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>false</ConformanceMode>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -145,11 +145,16 @@
   <ItemGroup>
     <ClCompile Include="ClientKeyInput.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Object.cpp" />
+    <ClCompile Include="Player.cpp" />
     <ClCompile Include="ProcessClientInput.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClientKeyInput.h" />
     <ClInclude Include="Global.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Object.h" />
+    <ClInclude Include="Player.h" />
     <ClInclude Include="ProcessClientInput.h" />
     <ClInclude Include="ServerData.h" />
   </ItemGroup>
