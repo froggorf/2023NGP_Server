@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <time.h>
 #include <chrono>
+#include "Global.h"
 
 
 
@@ -30,11 +31,19 @@ class ChatString
 public:
 	ChatString() {}
 	~ChatString() {}
-	ChatString(int pn, std::string cd) { playerNumber = pn; chatData = cd; };
+	ChatString(int pn, std::string cd)
+	{
+		playerNumber = pn;
+		for(int i=0; i<cd.size(); ++i)
+		{
+			chatData[i] = cd[i];
+		}
+		chatData[cd.size()] = '\0';
+	};
 public:
-	int playerNumber;       // -1 -> 커맨드 채팅, 0 -> 0번 플레이어, 1 -> 1번 플레이어,
+	int playerNumber{};       // -1 -> 커맨드 채팅, 0 -> 0번 플레이어, 1 -> 1번 플레이어,
 	// 2  -> 2번 플레이어, ..., MAX_PLAYER_COUNT-> 오프라인시 채팅
-	std::string chatData;
+	char chatData[CHATMAXBUFFER+1]={0,};
 };
 
 // 변수

@@ -10,8 +10,6 @@
 #pragma comment(lib, "winmm.lib")
 
 
-
-
 // 함수
 void ConnectAndAddPlayer(SOCKET&);
 void InitGame();						// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할 수 있도록 구현 예정
@@ -342,16 +340,16 @@ DWORD WINAPI ProcessEchoChat(LPVOID arg)
 	struct sockaddr_in clientaddr;
 
 	ChatString chat_string;
+	
 	int retval;
 	while (1)
 	{
-		retval = recv(echo_chat_socket, (char*)&chat_string, sizeof(ChatString), 0);
+		retval = recv(echo_chat_socket, (char*)&chat_string, sizeof(ChatString), MSG_WAITALL);
 		if (retval == SOCKET_ERROR) {
 			printf("?\n");
 			break;
 		}
-		printf("%d 플레이어 : %s 채팅 보냄\n",chat_string.playerNumber, chat_string.chatData.c_str());
-
+		
 		int size = socket_chat_vector.size();
 		for(int i =0; i<size; ++i)
 		{
