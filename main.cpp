@@ -16,7 +16,6 @@ void InitGame();						// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할
 void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock);
 VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime); 	// 시간 업데이트 함수
 void Send_Game_Time();
-void SendPlayerLocationToAllClient();
 int remainingSeconds = GAMETIME; // 5분을 초로 환산
 
 // 키 인풋 받아 처리하는 쓰레드
@@ -42,6 +41,14 @@ WSADATA wsa;
 // ElapsedTime 관련
 DWORD g_startTime;
 DWORD g_prevTime;
+
+// 게임 초기화 시 모든 소켓 정보 초기화하는 함수
+void ClearAllSocket();
+
+// 플레이어가 게임 진행중 게임을 종료해 서버에서 나갔을 때 함수
+void PlayerLogout(int playerNumber);
+CRITICAL_SECTION cs_for_logout;
+
 
 int main(int argc, char *argv[])
 {
@@ -165,6 +172,10 @@ int main(int argc, char *argv[])
 	}
 	// 소켓 닫기
 	closesocket(login_listen_sock);
+	closesocket(KeyInput_listen_sock);
+	closesocket(Cube_listen_sock);
+	closesocket(send_playerdata_listen_sock);
+	closesocket(echo_chat_listen_sock);
 
 
 
@@ -177,22 +188,29 @@ int main(int argc, char *argv[])
 	// 플레이어의 키 인풋 정보를 받는 쓰레드 생성
 
 	// TODO: while문으로 main 쓰레드에서는 중력, 충돌체크 및 시간 전송 등이 진행되도록 구현 예정
-	while (true) {
-
-
+	bool bGame = true;
+	while (bGame) {
 		// 시간 처리를 위한 메세지 루프
 		MSG msg;
 		while (GetMessage(&msg, NULL, 0, 0)) {
+			// 서버 종료
+			if (Current_Player_Count == 0)
+			{
+				printf("모든 플레이어 종료를 확인함\n");
+				bGame = false;
+				break;
+			}
+			
+
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
-
 			
 		}
+		
 
-		SendPlayerLocationToAllClient();
 	}
 
-
+	printf("서버 종료를 확인함 다시 while 돌리면 됨\n");
 	// TODO: EndGame() 로직 만들기.
 
 	// 소켓 닫기
@@ -240,8 +258,11 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 	printf("총 플레이어 수 : %d\n", Current_Player_Count);
 }
 
+
+
 void InitGame()
 {
+	
 	for (int i = 0; i < MAXPLAYERCOUNT; ++i) {
 		Player_Info[i].fPosition_x = 0.0f;
 		Player_Info[i].fPosition_y = -50.0f;
@@ -251,13 +272,33 @@ void InitGame()
 		Player_Info[i].fLook_z = 1.0f;
 	}
 
-	
+	// 게임 시간 초기화
+	g_startTime = g_prevTime = timeGetTime();
 
-	g_startTime = g_prevTime = 0;
-
-
-
+	// 큐브 데이터 초기화
 	Total_Cube.clear();
+
+	// 모든 소켓 초기화
+	ClearAllSocket();
+
+	// 현재 플레이어 수 조정
+	Current_Player_Count = 0;
+
+	// 클라이언트 주소 초기화
+	for(int i=0; i<MAXPLAYERCOUNT; ++i)
+	{
+		clientAddr[i] = sockaddr_in{};
+	}
+
+	// 모든 플레이어 키 버퍼 초기화
+	for(int i=0; i<MAXPLAYERCOUNT; ++i)
+	{
+		for(int j=0; j<256; ++j)	SetKeyBuffer(i, j, false);
+	}
+
+	// cs_for_logout 
+	DeleteCriticalSection(&cs_for_logout);
+	InitializeCriticalSection(&cs_for_logout);
 }
 
 void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
@@ -288,9 +329,10 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 	int retval;
 	while(1)
 	{
+		
 		retval = recv(ClientKeyInputSocket, (char*)&clientKeyInput, sizeof(clientKeyInput), 0);
 		if (retval == SOCKET_ERROR||(clientKeyInput.Key<0 || clientKeyInput.Key>256)) {
-			printf("?\n");
+			closesocket(ClientKeyInputSocket);
 			break;
 		}
 		if(!clientKeyInput.KeyDown && (clientKeyInput.Key==27||clientKeyInput.Key==0))
@@ -344,16 +386,35 @@ DWORD WINAPI ProcessEchoChat(LPVOID arg)
 	int retval;
 	while (1)
 	{
-		retval = recv(echo_chat_socket, (char*)&chat_string, sizeof(ChatString), MSG_WAITALL);
-		if (retval == SOCKET_ERROR) {
-			printf("?\n");
-			break;
+		if(echo_chat_socket != INVALID_SOCKET)
+		{
+			retval = recv(echo_chat_socket, (char*)&chat_string, sizeof(ChatString), MSG_WAITALL);
+			if (retval == SOCKET_ERROR) {
+				for (int i = 0; i < MAXPLAYERCOUNT; ++i)
+				{
+					if (socket_chat_vector[i] == echo_chat_socket) {
+						PlayerLogout(i);
+						break;
+					}
+				}
+				break;
+			}
 		}
+		
 		
 		int size = socket_chat_vector.size();
 		for(int i =0; i<size; ++i)
 		{
-			send(socket_chat_vector[i], (char*)&chat_string, sizeof(ChatString), 0);
+			if (socket_chat_vector[i] != INVALID_SOCKET)
+			{
+				retval = send(socket_chat_vector[i], (char*)&chat_string, sizeof(ChatString), 0);
+				if(retval == SOCKET_ERROR)
+				{
+					PlayerLogout(i);
+				}
+				
+			}
+				
 		}
 	}
 	return 0;
@@ -388,17 +449,18 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		Sleep(16);
 		int size = socket_SendPlayerData_vector.size();
 		for (int i = 0; i < size; ++i) {
-
-			retval = recv(socket_SendPlayerData_vector[i], (char*)&data, sizeof(struct Look_Data), MSG_WAITALL);
-			if (retval == SOCKET_ERROR)
+			if(socket_SendPlayerData_vector[i]!=INVALID_SOCKET)
 			{
-				printf("종료된 것으로 확인됨\n");
-				closesocket(socket_SendPlayerData_vector[i]);
-				socket_SendPlayerData_vector.erase(socket_SendPlayerData_vector.begin() + i);
-				break;
+				retval = recv(socket_SendPlayerData_vector[i], (char*)&data, sizeof(struct Look_Data), MSG_WAITALL);
+				if (retval == SOCKET_ERROR)
+				{
+					PlayerLogout(i);
+					continue;
+				}
+				Player_Info[data.PlayerNumber].fLook_x = data.fLook_x;
+				Player_Info[data.PlayerNumber].fLook_z = data.fLook_z;
 			}
-			Player_Info[data.PlayerNumber].fLook_x = data.fLook_x;
-			Player_Info[data.PlayerNumber].fLook_z = data.fLook_z;
+			
 		}
 
 		// ElapsedTime 계산
@@ -413,14 +475,18 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		ProcessClientInput(ElapsedTimeInSec);
 
 		//플레이어 정보 모두 전송
-		for (auto p = socket_SendPlayerData_vector.begin(); p != socket_SendPlayerData_vector.end(); ++p) {
-			retval = send(*p, (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
-			if (retval == SOCKET_ERROR) {
-				printf("종료된 것으로 확인됨\n");
-				closesocket(*p);
-				socket_SendPlayerData_vector.erase(p);
-				break;
+		for(int i =0; i<socket_SendPlayerData_vector.size(); ++i)
+		{
+			if(socket_SendPlayerData_vector[i]!=INVALID_SOCKET)
+			{
+				retval = send(socket_SendPlayerData_vector[i], (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
+				if (retval == SOCKET_ERROR) {
+					printf("엥?????????????????????????????????????\n");
+					PlayerLogout(i);
+					continue;
+				}
 			}
+			
 		}
 	}
 	return 0;
@@ -466,11 +532,22 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 	while (1)
 	{
 		// 큐브 리시브
-		retval = recv(CubeSocket, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
-		if (retval == SOCKET_ERROR) {
-			printf("?\n");
-			break;
+		if(CubeSocket!=INVALID_SOCKET)
+		{
+			retval = recv(CubeSocket, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+			if (retval == SOCKET_ERROR) {
+				for(int i=0; i<socket_Cube_vector.size();++i)
+				{
+					if(socket_Cube_vector[i]==CubeSocket)
+					{
+						PlayerLogout(i);
+						break;
+					}
+				}
+				break;
+			}
 		}
+		
 		printf("Cube Position - %.2f, %.2f, %.2f\n", clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
 		printf("Cube Color - %.2f, %.2f, %.2f\n", clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b);
 		printf("Cube Add or Delete - %s\n", clientCubeInput.AddorDelete ? "Add" : "Delete");
@@ -490,14 +567,19 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 				// add to Total_Cube
 				Total_Cube.push_back(clientCubeInput);
 				// 큐브 send to every client
-				for (auto i : socket_Cube_vector) {
-					int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
-					if (retval == SOCKET_ERROR) {
-						err_display("send()");
-						break;
+				for(int i=0; i<socket_Cube_vector.size(); ++i)
+				{
+					if(socket_Cube_vector[i]!=INVALID_SOCKET)
+					{
+						int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+						if (retval == SOCKET_ERROR) {
+							PlayerLogout(i);
+							break;
+						}
+						std::cout << "Sending Add cube_info to the client" << std::endl;
 					}
-					std::cout << "Sending Add cube_info to the client" << std::endl;
 				}
+				
 			}
 		}
 		// Cube Delete
@@ -514,13 +596,17 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 				printf("큐브 삭제 가능\n");
 				Total_Cube.erase(it);
 
-				for (auto i : socket_Cube_vector) {
-					int retval = send(i, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
-					if (retval == SOCKET_ERROR) {
-						err_display("send()");
-						break;
+				for(int i=0; i<socket_Cube_vector.size(); ++i)
+				{
+					if(socket_Cube_vector[i]!=INVALID_SOCKET)
+					{
+						int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+						if (retval == SOCKET_ERROR) {
+							PlayerLogout(i);
+							break;
+						}
+						std::cout << "Sending Delete cube_info to the client" << std::endl;
 					}
-					std::cout << "Sending Delete cube_info to the client" << std::endl;
 				}
 			}
 			else {
@@ -550,37 +636,39 @@ VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
 			if (cube.fColor_g - 1.0f < FLT_EPSILON) ++player_cube_count[1];
 			if (cube.fColor_b - 1.0f < FLT_EPSILON) ++player_cube_count[2];
 		}
-		for(const auto client_sock : socket_vector)
+		for(int i=0; i<socket_vector.size(); ++i)
 		{
-			int retval = send(client_sock, (char*)&player_cube_count, sizeof(int) * MAXPLAYERCOUNT, 0);
-			if(retval==SOCKET_ERROR)
+			if(socket_vector[i] !=INVALID_SOCKET)
 			{
-				err_display("game end send()");
-				break;
+				int retval = send(socket_vector[i], (char*)&player_cube_count, sizeof(int) * MAXPLAYERCOUNT, 0);
+				if (retval == SOCKET_ERROR)
+				{
+					PlayerLogout(i);
+					break;
+				}
 			}
 		}
 		// 타이머 종료
 		KillTimer(hwnd, TIMER_ID);
-		for (auto i : socket_vector)	closesocket(i);		// 시간 소켓 close
+		//for (int i = 0; i < MAXPLAYERCOUNT; ++i)	closesocket(socket_vector[i]);		// 시간 소켓 close
 	}
 }
 
 
 void Send_Game_Time() {
 	// 시간 데이터 보내기
-	for (auto i : socket_vector) {
-		int retval = send(i, (char*)&remainingSeconds, sizeof(int), 0);
-		if (retval == SOCKET_ERROR) {
-			err_display("send()");
-			break;
+	for(int i=0; i<socket_vector.size(); ++i)
+	{
+		if(socket_vector[i])
+		{
+			int retval = send(socket_vector[i], (char*)&remainingSeconds, sizeof(int), 0);
+			if (retval == SOCKET_ERROR) {
+				PlayerLogout(i);
+				continue;
+			}
 		}
 	}
 	std::cout << "Sending time to the client: " << remainingSeconds << " seconds" << std::endl;
-}
-
-void SendPlayerLocationToAllClient()
-{
-
 }
 
 bool Check_Add_Cube(Cube_Info cube)
@@ -609,3 +697,51 @@ bool CompareXMFLOAT3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b) {
 	return (a.x == b.x && a.y == b.y && a.z == b.z);
 }
 
+
+void ClearAllSocket()
+{
+	/* 키 인풋 소켓의 경우 다른 클라들에게 정보를 전송할 필요가 없어 해당 쓰레드에서 지역변수로 선언되어 초기화 할 필요가 없음. (CloseSocket은 정상 진행) */
+	for(auto p = socket_vector.begin(); p!=socket_vector.end(); ++p)	if (*p != INVALID_SOCKET) closesocket(*p);
+	for (auto p = socket_Cube_vector.begin(); p != socket_Cube_vector.end(); ++p)	if (*p != INVALID_SOCKET) closesocket(*p);
+	for (auto p = socket_SendPlayerData_vector.begin(); p != socket_SendPlayerData_vector.end(); ++p)	if (*p != INVALID_SOCKET) closesocket(*p);
+	for (auto p = socket_chat_vector.begin(); p != socket_chat_vector.end(); ++p)	if (*p != INVALID_SOCKET) closesocket(*p);
+
+	socket_vector.clear();
+	socket_Cube_vector.clear();
+	socket_SendPlayerData_vector.clear();
+	socket_chat_vector.clear();
+}
+
+bool bPlayerLogout[MAXPLAYERCOUNT] = { false, };
+
+void PlayerLogout(int playerNumber)
+{
+	
+	// 소켓 정리
+	EnterCriticalSection(&cs_for_logout);
+	if (socket_vector[playerNumber] != INVALID_SOCKET && !bPlayerLogout[playerNumber]) {
+		bPlayerLogout[playerNumber] = true;
+		printf(" %d 번째 플레이어가 로그아웃 하였습니다.\n ", playerNumber);
+		closesocket(socket_vector[playerNumber]);
+		//if (socket_Cube_vector[playerNumber] != INVALID_SOCKET)	
+		closesocket(socket_Cube_vector[playerNumber]);
+		//if (socket_SendPlayerData_vector[playerNumber] != INVALID_SOCKET)	
+		closesocket(socket_SendPlayerData_vector[playerNumber]);
+		//if (socket_chat_vector[playerNumber] != INVALID_SOCKET)	
+		closesocket(socket_chat_vector[playerNumber]);
+		socket_vector[playerNumber] = INVALID_SOCKET;
+		socket_Cube_vector[playerNumber] = INVALID_SOCKET;
+		socket_SendPlayerData_vector[playerNumber] = INVALID_SOCKET;
+		socket_chat_vector[playerNumber] = INVALID_SOCKET;
+
+		//socket_vector.erase(socket_vector.begin() + playerNumber);
+		//socket_Cube_vector.erase(socket_Cube_vector.begin() + playerNumber);
+		//socket_SendPlayerData_vector.erase(socket_SendPlayerData_vector.begin() + playerNumber);
+		//socket_chat_vector.erase(socket_chat_vector.begin() + playerNumber);
+
+		// 현재 플레이어 수 줄이기
+		Current_Player_Count -= 1;
+		printf("%d 명의 플레이어만 남음\n",Current_Player_Count);
+	}
+	LeaveCriticalSection(&cs_for_logout);
+}
