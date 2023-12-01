@@ -373,23 +373,20 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		float ElapsedTimeInSec = (float)ElapsedTime / 1000.0f;
 
 		//플레이어 이동로직 
-		//ProcessClientInput(ElapsedTimeInSec);
+		// 플레이어 충돌체크 및 움직임 갱신
+		for (int i = 0; i < MAXPLAYERCOUNT; ++i)
+		{
+			vPlayer[i].Set_Look_Vector(DirectX::XMFLOAT3(Player_Info[i].fLook_x, 0, Player_Info[i].fLook_z));
+			vPlayer[i].Set_Right_Vector(vPlayer[i].Get_Look_Vector());
+					
+			vPlayer[i].Move(i, PLAYER_MOVE_DISTANCE * ElapsedTimeInSec, true);
+			vPlayer[i].Update(i, ElapsedTimeInSec);
+			vPlayer[i].Udt_N_Prcs_Collision(ppObjects, nObjects);
 
-		//vPlayer[0].Set_Position(DirectX::XMFLOAT3(Player_Info[0].fPosition_x, Player_Info[0].fPosition_y, Player_Info[0].fPosition_z));
-		//std::cout << vPlayer->Get_Position().x << std::endl;
-		vPlayer[0].Set_Look_Vector(DirectX::XMFLOAT3(Player_Info[0].fLook_x, 0, Player_Info[0].fLook_z));
-		vPlayer[0].Set_Right_Vector(vPlayer[0].Get_Look_Vector());
-
-		vPlayer[0].Move(0, PLAYER_MOVE_DISTANCE * ElapsedTimeInSec, true);
-		vPlayer[0].Update(0, ElapsedTimeInSec);
-		vPlayer[0].Udt_N_Prcs_Collision(ppObjects, nObjects);
-
-		Player_Info[0].fPosition_x = vPlayer[0].Get_Position().x;
-		Player_Info[0].fPosition_y = vPlayer[0].Get_Position().y;
-		Player_Info[0].fPosition_z = vPlayer[0].Get_Position().z;
-
-		//printf("%f - %f - %f\n", Player_Info[0].fPosition_x, Player_Info[0].fPosition_y, Player_Info[0].fPosition_z);
-	
+			Player_Info[i].fPosition_x = vPlayer[i].Get_Position().x;
+			Player_Info[i].fPosition_y = vPlayer[i].Get_Position().y;
+			Player_Info[i].fPosition_z = vPlayer[i].Get_Position().z;
+		}
 		
 
 		//플레이어 정보 모두 전송

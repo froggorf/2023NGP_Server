@@ -21,7 +21,7 @@ public:
 	DirectX::XMFLOAT3 Get_Position();
 
 	//
-	DirectX::BoundingOrientedBox Get_OBB();
+	DirectX::BoundingOrientedBox Get_OBB(int nType);
 
 	void Set_Position(float x, float y, float z);
 	void Set_Position(DirectX::XMFLOAT3 xmf3_Position);

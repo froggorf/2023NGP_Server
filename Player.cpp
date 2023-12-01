@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "Player.h"
 #include "ClientKeyInput.h"
 
@@ -18,9 +20,9 @@ CPlayer::CPlayer() {
 
 	m_xmf3_Velocity = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
 	m_xmf3_Gravity = DirectX::XMFLOAT3(0.0f, -10.0f, 0.0f);
-	m_fMax_Velocity = 75.0f;
+	m_fMax_Velocity = 25.0f;
 	m_fMax_Gravity = 75.0f;
-	m_fFriction = 500.0f;
+	m_fFriction = 2000.0f;
 
 	m_xmf3_Calculated_Vel = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
 
@@ -71,9 +73,6 @@ void CPlayer::Move(int PlayerNumber, float fDistance, bool bVelocity) {
 		xmf3_Shift = Vector3::Add(xmf3_Shift, m_xmf3_Right, -fDistance);
 	}
 
-	/*if (GetKeyBuffer(PlayerNumber, VK_SPACE)) {
-		xmf3_Shift = Vector3::Add(xmf3_Shift, m_xmf3_Up, fDistance);
-	}*/
 
 	if (m_bAble_2_Jump) {
 		if (GetKeyBuffer(PlayerNumber, VK_SPACE)) {
@@ -125,7 +124,7 @@ void CPlayer::Update(int PlayerNumber, float fElapsed_Time) {
 	}
 
 	m_xmf3_Calculated_Vel = Vector3::Multiply(m_xmf3_Velocity, fElapsed_Time, false);
-	Move(m_xmf3_Calculated_Vel, false);
+	//Move(m_xmf3_Calculated_Vel, false);
 
 	if (m_pPlayer_Udt_Context) {
 		Player_Udt_Callback(fElapsed_Time);
@@ -150,9 +149,8 @@ void CPlayer::Update(int PlayerNumber, float fElapsed_Time) {
 		m_xmf3_Velocity.z = xmf3_Friction.z;
 	}
 
-	Prepare_Render();
+	//Prepare_Render();
 }
-
 
 void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects) {
 	DirectX::XMFLOAT3 xmf3_Player_Position = Get_Position();
@@ -176,11 +174,12 @@ void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects) {
 
 	// axis Y
 	Move(0.0f, m_xmf3_Calculated_Vel.y, 0.0f);
+	Prepare_Render();
 
 	//
 	for (int& num : vCrashed_Objs) {
-		d3d_OBB_Player = Get_OBB();
-		d3d_OBB_Object = ppObject[num]->Get_OBB();
+		d3d_OBB_Player = Get_OBB(0);
+		d3d_OBB_Object = ppObject[num]->Get_OBB(1);
 
 		if (d3d_OBB_Player.Intersects(d3d_OBB_Object)) {
 			DirectX::XMFLOAT3 xmf3_Object_Position = ppObject[num]->Get_Position();
@@ -192,16 +191,20 @@ void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects) {
 			else {
 				m_xmf4x4_World._42 = m_xmf3_Position.y = xmf3_Object_Position.y - CUBE_WIDTH / 2 - PLAYER_HEIGHT / 2 - PLAYER_COLLISION_OFFSET;
 			}
+
+			//
+			OutputDebugStringA("Crashed!!\n");
 		}
 	}
 
 	// axis x
 	Move(m_xmf3_Calculated_Vel.x, 0.0f, 0.0f);
+	Prepare_Render();
 
 	//
 	for (int& num : vCrashed_Objs) {
-		d3d_OBB_Player = Get_OBB();
-		d3d_OBB_Object = ppObject[num]->Get_OBB();
+		d3d_OBB_Player = Get_OBB(0);
+		d3d_OBB_Object = ppObject[num]->Get_OBB(1);
 
 		if (d3d_OBB_Player.Intersects(d3d_OBB_Object)) {
 			DirectX::XMFLOAT3 xmf3_Object_Position = ppObject[num]->Get_Position();
@@ -218,24 +221,28 @@ void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects) {
 
 	// axis z
 	Move(0.0f, 0.0f, m_xmf3_Calculated_Vel.z);
+	Prepare_Render();
 
 	//
 	for (int& num : vCrashed_Objs) {
-		d3d_OBB_Player = Get_OBB();
-		d3d_OBB_Object = ppObject[num]->Get_OBB();
+		d3d_OBB_Player = Get_OBB(0);
+		d3d_OBB_Object = ppObject[num]->Get_OBB(1);
 
 		if (d3d_OBB_Player.Intersects(d3d_OBB_Object)) {
 			DirectX::XMFLOAT3 xmf3_Object_Position = ppObject[num]->Get_Position();
 			float fNew_Position_Z = 0.0f;
 
 			if (m_xmf3_Calculated_Vel.z < 0) {
-				m_xmf4x4_World._42 = m_xmf3_Position.z = xmf3_Object_Position.z + CUBE_WIDTH / 2 + PLAYER_WIDTH / 2 + PLAYER_COLLISION_OFFSET;
+				m_xmf4x4_World._43 = m_xmf3_Position.z = xmf3_Object_Position.z + CUBE_WIDTH / 2 + PLAYER_WIDTH / 2 + PLAYER_COLLISION_OFFSET;
 			}
 			else {
-				m_xmf4x4_World._42 = m_xmf3_Position.z = xmf3_Object_Position.z - CUBE_WIDTH / 2 - PLAYER_WIDTH / 2 - PLAYER_COLLISION_OFFSET;
+				m_xmf4x4_World._43 = m_xmf3_Position.z = xmf3_Object_Position.z - CUBE_WIDTH / 2 - PLAYER_WIDTH / 2 - PLAYER_COLLISION_OFFSET;
 			}
 		}
 	}
+
+	//
+
 }
 
 
