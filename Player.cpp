@@ -247,3 +247,23 @@ void CPlayer::Prepare_Render() {
 }
 
 
+
+bool CPlayer::Check_Collision_Add_Cube(CObject* pObject, int PlayerNumber) {
+	DirectX::XMFLOAT3 xmf3_Player_Position = Get_Position();
+	DirectX::XMFLOAT3 xmf3_Cube_Position = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
+	
+
+	DirectX::BoundingOrientedBox d3d_OBB_Player;
+	DirectX::BoundingOrientedBox d3d_OBB_Object;
+
+	//
+
+	d3d_OBB_Player = Get_OBB(0);
+	d3d_OBB_Object = pObject->Get_OBB(1);
+	if (d3d_OBB_Player.Intersects(d3d_OBB_Object)) 
+	{
+		return true;
+	}
+	return false;
+	
+}

@@ -89,6 +89,7 @@ public:
 	//virtual void Prcs_Collision(CObject* pObject);
 	virtual void Udt_N_Prcs_Collision(CObject** ppObject, int nObjects, int PlayerNumber);
 	void Prepare_Render();
+	bool Check_Collision_Add_Cube(CObject* pObject, int PlayerNumber);
 };
 
 

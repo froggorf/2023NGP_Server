@@ -757,23 +757,19 @@ void Send_Game_Time() {
 
 bool Check_Add_Cube(Cube_Info cube)
 {
+	CObject* CheckCollsion_Cube = NULL;
+	CheckCollsion_Cube = new CObject();
+	CheckCollsion_Cube->Set_Position(cube.fPosition_x, cube.fPosition_y, cube.fPosition_z);
 	for (int i = 0; i < MAXPLAYERCOUNT; i++)
 	{
-		// X, Z 축에 대해 겹치는지 확인
-		float xDiff = Player_Info[i].fPosition_x - cube.fPosition_x;
-		float zDiff = Player_Info[i].fPosition_z - cube.fPosition_z;
-
-		bool isXInRange = (xDiff >= -5.0f) && (xDiff <= 5.0f);
-		bool isZInRange = (zDiff >= -5.0f) && (zDiff <= 5.0f);
-
-		// Y 축에 대해 높이 확인
-		bool isYInRange = (Player_Info[i].fPosition_y >= cube.fPosition_y) && (Player_Info[i].fPosition_y <= cube.fPosition_y + 10.0f);
-
-		printf("xDiff : %.2f, zDiff : %.2f, bool Y : %d\n", xDiff, zDiff, isYInRange);
-		// 모든 축에서 조건이 만족하는지 확인하여 블록 안에 플레이어가 있는지 반환
-		return isXInRange && isZInRange && isYInRange;
-		
+		bool checkCube = vPlayer[i].Check_Collision_Add_Cube(CheckCollsion_Cube, i);
+		if (checkCube)
+		{
+			return true;
+		}
 	}
+	return false;
+
 }
 
 
