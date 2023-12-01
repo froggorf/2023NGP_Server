@@ -2,15 +2,9 @@
 #include "ProcessClientInput.h"
 #include "ClientKeyInput.h"
 #include "Global.h"
-
+#include "Player.h"
 #include <iostream>
 
-#define DIRECT_FORWARD 0x01
-#define DIRECT_BACKWARD 0x02
-#define DIRECT_LEFT 0x04
-#define DIRECT_RIGHT 0x08
-#define DIRECT_UP 0x010
-#define DIRECT_DOWN 0x20
 
 
 
