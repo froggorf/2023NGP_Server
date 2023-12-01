@@ -54,6 +54,22 @@ int main(int argc, char *argv[])
 {
 	int retval;
 
+	nObjects = (CUBE_INIT_RING_NUMBER * 2 + 1) * (CUBE_INIT_RING_NUMBER * 2 + 1);
+	ppObjects = new CObject * [CUBE_MAX_NUMBER] { NULL };
+
+	int c_i = 0;
+	CObject* pObject = NULL;
+
+	for (int x = -CUBE_INIT_RING_NUMBER; x <= CUBE_INIT_RING_NUMBER; ++x) {
+		for (int z = -CUBE_INIT_RING_NUMBER; z <= CUBE_INIT_RING_NUMBER; ++z) {
+			pObject = new CObject();
+			pObject->Set_Position(CUBE_WIDTH * x, 0.0f, CUBE_WIDTH * z);
+			//pObject->Set_Color(CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, 0.0f);
+			ppObjects[c_i++] = pObject;
+		}
+	}
+
+
 	//----------------로그인 소켓 만드는 과정----------------   //TODO: 아래꺼랑 합쳐서 함수화 처리 예정
 	// 윈속 초기화
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
@@ -472,7 +488,21 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		float ElapsedTimeInSec = (float)ElapsedTime / 1000.0f;
 		
 		//플레이어 이동로직 
-		ProcessClientInput(ElapsedTimeInSec);
+		// 플레이어 충돌체크 및 움직임 갱신
+		for (int i = 0; i < MAXPLAYERCOUNT; ++i)
+		{
+			vPlayer[i].Set_Look_Vector(DirectX::XMFLOAT3(Player_Info[i].fLook_x, 0, Player_Info[i].fLook_z));
+			vPlayer[i].Set_Right_Vector(vPlayer[i].Get_Look_Vector());
+					
+			vPlayer[i].Move(i, PLAYER_MOVE_DISTANCE * ElapsedTimeInSec, true);
+			vPlayer[i].Update(i, ElapsedTimeInSec);
+			vPlayer[i].Udt_N_Prcs_Collision(ppObjects, nObjects);
+
+			Player_Info[i].fPosition_x = vPlayer[i].Get_Position().x;
+			Player_Info[i].fPosition_y = vPlayer[i].Get_Position().y;
+			Player_Info[i].fPosition_z = vPlayer[i].Get_Position().z;
+		}
+		
 
 		//플레이어 정보 모두 전송
 		for(int i =0; i<socket_SendPlayerData_vector.size(); ++i)
@@ -566,6 +596,11 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 				printf("큐브 설치 가능\n");
 				// add to Total_Cube
 				Total_Cube.push_back(clientCubeInput);
+				// add to Cube Object
+				CObject* pObject = new CObject();
+				pObject->Set_Position(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
+				ppObjects[nObjects++] = pObject;
+
 				// 큐브 send to every client
 				for(int i=0; i<socket_Cube_vector.size(); ++i)
 				{
@@ -596,9 +631,29 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 				printf("큐브 삭제 가능\n");
 				Total_Cube.erase(it);
 
-				for(int i=0; i<socket_Cube_vector.size(); ++i)
+				// delete to Cube Object
+				CObject* pSelected_Object = NULL;
+				int nSelected_Index = 0;
+				for (int i = 0; i < nObjects; ++i) {
+					if (CompareXMFLOAT3(ppObjects[i]->Get_Position(), DirectX::XMFLOAT3(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z)) )
+					{
+						pSelected_Object = ppObjects[i];
+						nSelected_Index = i;
+					}
+				}
+				if (pSelected_Object) 
 				{
-					if(socket_Cube_vector[i]!=INVALID_SOCKET)
+					ppObjects[nSelected_Index] = NULL;
+
+					if (nSelected_Index != nObjects - 1) {
+						ppObjects[nSelected_Index] = ppObjects[nObjects - 1];
+					}
+					--nObjects;
+				}
+
+				for (int i = 0; i < socket_Cube_vector.size(); ++i)
+				{
+					if (socket_Cube_vector[i] != INVALID_SOCKET)
 					{
 						int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
 						if (retval == SOCKET_ERROR) {
