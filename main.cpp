@@ -18,6 +18,8 @@ VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime); 	
 void Send_Game_Time();
 int remainingSeconds = GAMETIME; // 5분을 초로 환산
 
+HWND timerHWND;
+
 // 키 인풋 받아 처리하는 쓰레드
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg);
 
@@ -46,189 +48,197 @@ DWORD g_prevTime;
 void ClearAllSocket();
 
 // 플레이어가 게임 진행중 게임을 종료해 서버에서 나갔을 때 함수
-void PlayerLogout(int playerNumber);
+bool PlayerLogout(int playerNumber);
 CRITICAL_SECTION cs_for_logout;
+bool bPlayerLogout[MAXPLAYERCOUNT] = { false, };
 
 
 int main(int argc, char *argv[])
 {
 	int retval;
 
-	nObjects = (CUBE_INIT_RING_NUMBER * 2 + 1) * (CUBE_INIT_RING_NUMBER * 2 + 1);
-	ppObjects = new CObject * [CUBE_MAX_NUMBER] { NULL };
+	
 
-	int c_i = 0;
-	CObject* pObject = NULL;
+	while(true)
+	{
+		nObjects = (CUBE_INIT_RING_NUMBER * 2 + 1) * (CUBE_INIT_RING_NUMBER * 2 + 1);
+		ppObjects = new CObject * [CUBE_MAX_NUMBER] { NULL };
 
-	for (int x = -CUBE_INIT_RING_NUMBER; x <= CUBE_INIT_RING_NUMBER; ++x) {
-		for (int z = -CUBE_INIT_RING_NUMBER; z <= CUBE_INIT_RING_NUMBER; ++z) {
-			pObject = new CObject();
-			pObject->Set_Position(CUBE_WIDTH * x, 0.0f, CUBE_WIDTH * z);
-			//pObject->Set_Color(CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, 0.0f);
-			ppObjects[c_i++] = pObject;
+		int c_i = 0;
+		CObject* pObject = NULL;
+
+		for (int x = -CUBE_INIT_RING_NUMBER; x <= CUBE_INIT_RING_NUMBER; ++x) {
+			for (int z = -CUBE_INIT_RING_NUMBER; z <= CUBE_INIT_RING_NUMBER; ++z) {
+				pObject = new CObject();
+				pObject->Set_Position(CUBE_WIDTH * x, 0.0f, CUBE_WIDTH * z);
+				//pObject->Set_Color(CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, 0.0f);
+				ppObjects[c_i++] = pObject;
+			}
 		}
-	}
+
+		
+		//----------------로그인 소켓 만드는 과정----------------   //TODO: 아래꺼랑 합쳐서 함수화 처리 예정
+		// 윈속 초기화
+		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+			return 1;
+
+		// 소켓 생성(플레이어 접속 체크 소켓)
+		SOCKET login_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (login_listen_sock == INVALID_SOCKET) err_quit("socket()");
+
+		// bind()
+		struct sockaddr_in serveraddr;
+		memset(&serveraddr, 0, sizeof(serveraddr));
+		serveraddr.sin_family = AF_INET;
+		serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+		serveraddr.sin_port = htons(SERVERPORT);
+		retval = bind(login_listen_sock, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+		if (retval == SOCKET_ERROR) err_quit("bind()");
+
+		// listen()
+		retval = listen(login_listen_sock, SOMAXCONN);
+		if (retval == SOCKET_ERROR) err_quit("listen()");
+
+		//---------------- 소켓 만드는 과정(키 인풋 소켓)----------------
+		// 소켓 생성(키 인풋 리슨 소켓)
+		SOCKET KeyInput_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (KeyInput_listen_sock == INVALID_SOCKET) err_quit("socket()");
+
+		// bind() - KEYINPUTSERVERPORT 로 바인드,
+		struct sockaddr_in serveraddr_keyinput;
+		memset(&serveraddr_keyinput, 0, sizeof(serveraddr_keyinput));
+		serveraddr_keyinput.sin_family = AF_INET;
+		serveraddr_keyinput.sin_addr.s_addr = htonl(INADDR_ANY);
+		serveraddr_keyinput.sin_port = htons(KEYINPUTSERVERPORT);
+
+		if (bind(KeyInput_listen_sock, (struct sockaddr*)&serveraddr_keyinput, sizeof(serveraddr_keyinput))
+			== SOCKET_ERROR) err_quit("CreateClientKeyInputThread() - bind()");
+
+		// listen()
+		if (listen(KeyInput_listen_sock, SOMAXCONN)
+			== SOCKET_ERROR) err_quit("CreateClientKeyInputThread() - listen()");
+		
+
+		//---------------- 소켓 만드는 과정(큐브 소켓)----------------
+		// 소켓 생성(큐브 리슨 소켓)
+		SOCKET Cube_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (Cube_listen_sock == INVALID_SOCKET) err_quit("socket()");
+
+		// bind()
+		struct sockaddr_in serveraddr_Cube;
+		memset(&serveraddr_Cube, 0, sizeof(serveraddr_Cube));
+		serveraddr_Cube.sin_family = AF_INET;
+		serveraddr_Cube.sin_addr.s_addr = htonl(INADDR_ANY);
+		serveraddr_Cube.sin_port = htons(CUBESERVERPORT);
+
+		if (bind(Cube_listen_sock, (struct sockaddr*)&serveraddr_Cube, sizeof(serveraddr_Cube))
+			== SOCKET_ERROR) err_quit("CreateCubeThread() - bind()");
+
+		// listen()
+		if (listen(Cube_listen_sock, SOMAXCONN)
+			== SOCKET_ERROR) err_quit("CreateCubeThread() - listen()");
+
+		//---------------- 소켓 만드는 과정(플레이어 데이터 전송 소켓)----------------
+		// 소켓 생성(플레이어 데이터 전송 소켓)
+		SOCKET send_playerdata_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (send_playerdata_listen_sock == INVALID_SOCKET) err_quit("socket()");
+
+		// bind()
+		struct sockaddr_in serveraddr_sendPlayerData;
+		memset(&serveraddr_sendPlayerData, 0, sizeof(serveraddr_sendPlayerData));
+		serveraddr_sendPlayerData.sin_family = AF_INET;
+		serveraddr_sendPlayerData.sin_addr.s_addr = htonl(INADDR_ANY);
+		serveraddr_sendPlayerData.sin_port = htons(SENDPLAYERDATAPORT);
+
+		if (bind(send_playerdata_listen_sock, (struct sockaddr*)&serveraddr_sendPlayerData, sizeof(serveraddr_sendPlayerData))
+			== SOCKET_ERROR) err_quit("bind()");
+
+		// listen()
+		if (listen(send_playerdata_listen_sock, SOMAXCONN)
+			== SOCKET_ERROR) err_quit("listen()");
+
+		//---------------- 소켓 만드는 과정(채팅 소켓)----------------
+		// 소켓 생성(채팅 소켓)
+		SOCKET echo_chat_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (echo_chat_listen_sock == INVALID_SOCKET) err_quit("socket()");
+
+		// bind()
+		struct sockaddr_in serveraddr_chat;
+		memset(&serveraddr_chat, 0, sizeof(serveraddr_chat));
+		serveraddr_chat.sin_family = AF_INET;
+		serveraddr_chat.sin_addr.s_addr = htonl(INADDR_ANY);
+		serveraddr_chat.sin_port = htons(ECHOCHATDATAPORT);
+
+		if (bind(echo_chat_listen_sock, (struct sockaddr*)&serveraddr_chat, sizeof(serveraddr_chat))
+			== SOCKET_ERROR) err_quit("bind()");
+
+		// listen()
+		if (listen(echo_chat_listen_sock, SOMAXCONN)
+			== SOCKET_ERROR) err_quit("listen()");
+
+		//-----------------
+		// 게임 데이터 초기화
+		InitGame();
+		
+		//플레이어 데이터 전송 쓰레드 및 룩벡터 전송받는 쓰레드 미리 실행시키기
+		HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
+			(LPVOID)0, 0, NULL);
+		CloseHandle(hThread);
+
+		// 플레이어 지정한 수 인원 접속시키기
+		while (Current_Player_Count != MAXPLAYERCOUNT) {
+			ConnectAndAddPlayer(login_listen_sock);
+			CreateClientKeyInputThread(KeyInput_listen_sock);
+			CreateCubeThread(Cube_listen_sock);
+			CreateSendPlayerDataThread(send_playerdata_listen_sock);
+			CreateChatThread(echo_chat_listen_sock);
+		}
+		// 소켓 닫기
+		closesocket(login_listen_sock);
+		closesocket(KeyInput_listen_sock);
+		closesocket(Cube_listen_sock);
+		closesocket(send_playerdata_listen_sock);
+		closesocket(echo_chat_listen_sock);
 
 
-	//----------------로그인 소켓 만드는 과정----------------   //TODO: 아래꺼랑 합쳐서 함수화 처리 예정
-	// 윈속 초기화
-	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-		return 1;
 
-	// 소켓 생성(플레이어 접속 체크 소켓)
-	SOCKET login_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (login_listen_sock == INVALID_SOCKET) err_quit("socket()");
+		// TODO: 게임 시작 되므로 게임 시작 관련 스레드 제작 예정
 
-	// bind()
-	struct sockaddr_in serveraddr;
-	memset(&serveraddr, 0, sizeof(serveraddr));
-	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serveraddr.sin_port = htons(SERVERPORT);
-	retval = bind(login_listen_sock, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
-	if (retval == SOCKET_ERROR) err_quit("bind()");
+		// 타이머 초기화
+		SetTimer(timerHWND, TIMER_ID, 1000, TimerProc); // 1000ms(1초)마다 타이머 호출
+		std::cout << "타이머 시작 - " << remainingSeconds << std::endl;
 
-	// listen()
-	retval = listen(login_listen_sock, SOMAXCONN);
-	if (retval == SOCKET_ERROR) err_quit("listen()");
+		// 플레이어의 키 인풋 정보를 받는 쓰레드 생성
 
-	//---------------- 소켓 만드는 과정(키 인풋 소켓)----------------
-	// 소켓 생성(키 인풋 리슨 소켓)
-	SOCKET KeyInput_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (KeyInput_listen_sock == INVALID_SOCKET) err_quit("socket()");
+		// TODO: while문으로 main 쓰레드에서는 중력, 충돌체크 및 시간 전송 등이 진행되도록 구현 예정
+		bool bGame = true;
+		while (bGame) {
+			// 시간 처리를 위한 메세지 루프
+			MSG msg;
+			while (GetMessage(&msg, NULL, 0, 0)) {
+				// 서버 종료
+				if (Current_Player_Count == 0)
+				{
+					printf("모든 플레이어 종료를 확인함\n");
+					bGame = false;
+					break;
+				}
+				
 
-	// bind() - KEYINPUTSERVERPORT 로 바인드,
-	struct sockaddr_in serveraddr_keyinput;
-	memset(&serveraddr_keyinput, 0, sizeof(serveraddr_keyinput));
-	serveraddr_keyinput.sin_family = AF_INET;
-	serveraddr_keyinput.sin_addr.s_addr = htonl(INADDR_ANY);
-	serveraddr_keyinput.sin_port = htons(KEYINPUTSERVERPORT);
-
-	if (bind(KeyInput_listen_sock, (struct sockaddr*)&serveraddr_keyinput, sizeof(serveraddr_keyinput))
-		== SOCKET_ERROR) err_quit("CreateClientKeyInputThread() - bind()");
-
-	// listen()
-	if (listen(KeyInput_listen_sock, SOMAXCONN)
-		== SOCKET_ERROR) err_quit("CreateClientKeyInputThread() - listen()");
-	
-
-	//---------------- 소켓 만드는 과정(큐브 소켓)----------------
-	// 소켓 생성(큐브 리슨 소켓)
-	SOCKET Cube_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (Cube_listen_sock == INVALID_SOCKET) err_quit("socket()");
-
-	// bind()
-	struct sockaddr_in serveraddr_Cube;
-	memset(&serveraddr_Cube, 0, sizeof(serveraddr_Cube));
-	serveraddr_Cube.sin_family = AF_INET;
-	serveraddr_Cube.sin_addr.s_addr = htonl(INADDR_ANY);
-	serveraddr_Cube.sin_port = htons(CUBESERVERPORT);
-
-	if (bind(Cube_listen_sock, (struct sockaddr*)&serveraddr_Cube, sizeof(serveraddr_Cube))
-		== SOCKET_ERROR) err_quit("CreateCubeThread() - bind()");
-
-	// listen()
-	if (listen(Cube_listen_sock, SOMAXCONN)
-		== SOCKET_ERROR) err_quit("CreateCubeThread() - listen()");
-
-	//---------------- 소켓 만드는 과정(플레이어 데이터 전송 소켓)----------------
-	// 소켓 생성(플레이어 데이터 전송 소켓)
-	SOCKET send_playerdata_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (send_playerdata_listen_sock == INVALID_SOCKET) err_quit("socket()");
-
-	// bind()
-	struct sockaddr_in serveraddr_sendPlayerData;
-	memset(&serveraddr_sendPlayerData, 0, sizeof(serveraddr_sendPlayerData));
-	serveraddr_sendPlayerData.sin_family = AF_INET;
-	serveraddr_sendPlayerData.sin_addr.s_addr = htonl(INADDR_ANY);
-	serveraddr_sendPlayerData.sin_port = htons(SENDPLAYERDATAPORT);
-
-	if (bind(send_playerdata_listen_sock, (struct sockaddr*)&serveraddr_sendPlayerData, sizeof(serveraddr_sendPlayerData))
-		== SOCKET_ERROR) err_quit("bind()");
-
-	// listen()
-	if (listen(send_playerdata_listen_sock, SOMAXCONN)
-		== SOCKET_ERROR) err_quit("listen()");
-
-	//---------------- 소켓 만드는 과정(채팅 소켓)----------------
-	// 소켓 생성(채팅 소켓)
-	SOCKET echo_chat_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (echo_chat_listen_sock == INVALID_SOCKET) err_quit("socket()");
-
-	// bind()
-	struct sockaddr_in serveraddr_chat;
-	memset(&serveraddr_chat, 0, sizeof(serveraddr_chat));
-	serveraddr_chat.sin_family = AF_INET;
-	serveraddr_chat.sin_addr.s_addr = htonl(INADDR_ANY);
-	serveraddr_chat.sin_port = htons(ECHOCHATDATAPORT);
-
-	if (bind(echo_chat_listen_sock, (struct sockaddr*)&serveraddr_chat, sizeof(serveraddr_chat))
-		== SOCKET_ERROR) err_quit("bind()");
-
-	// listen()
-	if (listen(echo_chat_listen_sock, SOMAXCONN)
-		== SOCKET_ERROR) err_quit("listen()");
-
-	//-----------------
-	// 게임 데이터 초기화
-	InitGame();
-	
-	//플레이어 데이터 전송 쓰레드 및 룩벡터 전송받는 쓰레드 미리 실행시키기
-	HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
-		(LPVOID)0, 0, NULL);
-	CloseHandle(hThread);
-
-	// 플레이어 지정한 수 인원 접속시키기
-	while (Current_Player_Count != MAXPLAYERCOUNT) {
-		ConnectAndAddPlayer(login_listen_sock);
-		CreateClientKeyInputThread(KeyInput_listen_sock);
-		CreateCubeThread(Cube_listen_sock);
-		CreateSendPlayerDataThread(send_playerdata_listen_sock);
-		CreateChatThread(echo_chat_listen_sock);
-	}
-	// 소켓 닫기
-	closesocket(login_listen_sock);
-	closesocket(KeyInput_listen_sock);
-	closesocket(Cube_listen_sock);
-	closesocket(send_playerdata_listen_sock);
-	closesocket(echo_chat_listen_sock);
-
-
-
-	// TODO: 게임 시작 되므로 게임 시작 관련 스레드 제작 예정
-
-	// 타이머 초기화
-	SetTimer(NULL, TIMER_ID, 1000, TimerProc); // 1000ms(1초)마다 타이머 호출
-	std::cout << "타이머 시작 - " << remainingSeconds << std::endl;
-
-	// 플레이어의 키 인풋 정보를 받는 쓰레드 생성
-
-	// TODO: while문으로 main 쓰레드에서는 중력, 충돌체크 및 시간 전송 등이 진행되도록 구현 예정
-	bool bGame = true;
-	while (bGame) {
-		// 시간 처리를 위한 메세지 루프
-		MSG msg;
-		while (GetMessage(&msg, NULL, 0, 0)) {
-			// 서버 종료
-			if (Current_Player_Count == 0)
-			{
-				printf("모든 플레이어 종료를 확인함\n");
-				bGame = false;
-				break;
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+				
 			}
 			
 
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-			
 		}
-		
+
+		printf("서버 종료를 확인함 다시 while 돌리면 됨\n");
+		InitGame();
+		// TODO: EndGame() 로직 만들기.
+
 
 	}
-
-	printf("서버 종료를 확인함 다시 while 돌리면 됨\n");
-	// TODO: EndGame() 로직 만들기.
-
 	// 소켓 닫기
 	//closesocket(listen_sock);
 
@@ -262,6 +272,8 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 	Player_Info[Current_Player_Count].fPosition_y = 50.0f;
 	Player_Info[Current_Player_Count].fPosition_z = 0.0f;
 
+	vPlayer[Current_Player_Count].Set_Position(DirectX::XMFLOAT3(0.0f, 50.0f, 0.0f));
+
 	// 플레이어 수 증가
 	Current_Player_Count += 1;
 
@@ -278,7 +290,7 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 
 void InitGame()
 {
-	
+	// 플레이어 위치 정보 초기화
 	for (int i = 0; i < MAXPLAYERCOUNT; ++i) {
 		Player_Info[i].fPosition_x = 0.0f;
 		Player_Info[i].fPosition_y = -50.0f;
@@ -286,10 +298,14 @@ void InitGame()
 
 		Player_Info[i].fLook_x = 0.0f;
 		Player_Info[i].fLook_z = 1.0f;
+
+		vPlayer[i].Set_Position(DirectX::XMFLOAT3(0.0f, -50.0f, 0.0f));
+		vPlayer[i].Set_Look_Vector(DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f));
 	}
 
 	// 게임 시간 초기화
 	g_startTime = g_prevTime = timeGetTime();
+	remainingSeconds = GAMETIME;
 
 	// 큐브 데이터 초기화
 	Total_Cube.clear();
@@ -315,6 +331,14 @@ void InitGame()
 	// cs_for_logout 
 	DeleteCriticalSection(&cs_for_logout);
 	InitializeCriticalSection(&cs_for_logout);
+
+	// 로그아웃 변수 초기화
+	for(int i=0; i<MAXPLAYERCOUNT; ++i)
+	{
+		bPlayerLogout[i] = false;
+	}
+
+	KillTimer(timerHWND, TIMER_ID);
 }
 
 void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
@@ -369,6 +393,8 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 			printf("뗌\n");
 		}
 	}
+
+	printf("클라이언트 키 인풋은 잘 지워짐\n");
 	return 0;
 }
 void CreateChatThread(SOCKET& chat_listen_sock)
@@ -409,7 +435,8 @@ DWORD WINAPI ProcessEchoChat(LPVOID arg)
 				for (int i = 0; i < MAXPLAYERCOUNT; ++i)
 				{
 					if (socket_chat_vector[i] == echo_chat_socket) {
-						PlayerLogout(i);
+						if (PlayerLogout(i)) return 0;
+						
 						break;
 					}
 				}
@@ -426,13 +453,14 @@ DWORD WINAPI ProcessEchoChat(LPVOID arg)
 				retval = send(socket_chat_vector[i], (char*)&chat_string, sizeof(ChatString), 0);
 				if(retval == SOCKET_ERROR)
 				{
-					PlayerLogout(i);
+					if(PlayerLogout(i)) return -1;
 				}
 				
 			}
 				
 		}
 	}
+	printf("채팅 쓰레드는 잘 지워짐");
 	return 0;
 }
 void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
@@ -470,7 +498,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 				retval = recv(socket_SendPlayerData_vector[i], (char*)&data, sizeof(struct Look_Data), MSG_WAITALL);
 				if (retval == SOCKET_ERROR)
 				{
-					PlayerLogout(i);
+					if(PlayerLogout(i)) return -1;
 					continue;
 				}
 				Player_Info[data.PlayerNumber].fLook_x = data.fLook_x;
@@ -511,8 +539,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 			{
 				retval = send(socket_SendPlayerData_vector[i], (char*)&Player_Info, sizeof(struct Player_Info) * MAXPLAYERCOUNT, 0);
 				if (retval == SOCKET_ERROR) {
-					printf("엥?????????????????????????????????????\n");
-					PlayerLogout(i);
+					if (PlayerLogout(i)) return -1;
 					continue;
 				}
 			}
@@ -570,7 +597,7 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 				{
 					if(socket_Cube_vector[i]==CubeSocket)
 					{
-						PlayerLogout(i);
+						if (PlayerLogout(i)) return -1;
 						break;
 					}
 				}
@@ -608,7 +635,7 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 					{
 						int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
 						if (retval == SOCKET_ERROR) {
-							PlayerLogout(i);
+							if (PlayerLogout(i)) return -1;
 							break;
 						}
 						std::cout << "Sending Add cube_info to the client" << std::endl;
@@ -657,7 +684,7 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 					{
 						int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
 						if (retval == SOCKET_ERROR) {
-							PlayerLogout(i);
+							if (PlayerLogout(i)) return -1;
 							break;
 						}
 						std::cout << "Sending Delete cube_info to the client" << std::endl;
@@ -676,6 +703,7 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 
 // 타이머 콜백 함수
 VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
+	printf("시간 타이머 함수 실행중\n");
 	// 시간 업데이트
 	remainingSeconds--;
 	// 남은 시간이 0보다 크거나 같으면 클라이언트로 시간 업데이트 및 전송
@@ -698,13 +726,14 @@ VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
 				int retval = send(socket_vector[i], (char*)&player_cube_count, sizeof(int) * MAXPLAYERCOUNT, 0);
 				if (retval == SOCKET_ERROR)
 				{
-					PlayerLogout(i);
+					if (PlayerLogout(i)) return;
+					if(Current_Player_Count==0) KillTimer(timerHWND, TIMER_ID);
 					break;
 				}
 			}
 		}
 		// 타이머 종료
-		KillTimer(hwnd, TIMER_ID);
+		KillTimer(timerHWND, TIMER_ID);
 		//for (int i = 0; i < MAXPLAYERCOUNT; ++i)	closesocket(socket_vector[i]);		// 시간 소켓 close
 	}
 }
@@ -718,7 +747,7 @@ void Send_Game_Time() {
 		{
 			int retval = send(socket_vector[i], (char*)&remainingSeconds, sizeof(int), 0);
 			if (retval == SOCKET_ERROR) {
-				PlayerLogout(i);
+				if(PlayerLogout(i)) return;
 				continue;
 			}
 		}
@@ -767,9 +796,9 @@ void ClearAllSocket()
 	socket_chat_vector.clear();
 }
 
-bool bPlayerLogout[MAXPLAYERCOUNT] = { false, };
 
-void PlayerLogout(int playerNumber)
+
+bool PlayerLogout(int playerNumber)
 {
 	
 	// 소켓 정리
@@ -797,6 +826,10 @@ void PlayerLogout(int playerNumber)
 		// 현재 플레이어 수 줄이기
 		Current_Player_Count -= 1;
 		printf("%d 명의 플레이어만 남음\n",Current_Player_Count);
+		
 	}
 	LeaveCriticalSection(&cs_for_logout);
+	if (Current_Player_Count == 0) return true;
+	else return false;
+	
 }
