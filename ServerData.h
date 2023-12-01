@@ -7,7 +7,7 @@
 #include "Global.h"
 #include "Player.h"
 
-CPlayer* vPlayer = new CPlayer[3];
+CPlayer* vPlayer = new CPlayer[MAXPLAYERCOUNT];
 
 //CCube_Player* pCube_Player = new CCube_Player();
 CObject** ppObjects;
