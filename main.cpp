@@ -437,7 +437,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 					
 			vPlayer[i].Move(i, PLAYER_MOVE_DISTANCE * ElapsedTimeInSec, true);
 			vPlayer[i].Update(i, ElapsedTimeInSec);
-			vPlayer[i].Udt_N_Prcs_Collision(ppObjects, nObjects);
+			vPlayer[i].Udt_N_Prcs_Collision(ppObjects, nObjects, i);
 
 			Player_Info[i].fPosition_x = vPlayer[i].Get_Position().x;
 			Player_Info[i].fPosition_y = vPlayer[i].Get_Position().y;

@@ -8,7 +8,7 @@ struct Player_Info {
 	float fPosition_x, fPosition_y, fPosition_z;
 	float fLook_x, fLook_z;
 };
-extern struct Player_Info Player_Info[MAXPLAYERCOUNT];
+struct Player_Info Player_Info[MAXPLAYERCOUNT];
 
 //===========================================
 CPlayer::CPlayer() {
@@ -19,10 +19,10 @@ CPlayer::CPlayer() {
 	m_xmf3_Look = DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f);
 
 	m_xmf3_Velocity = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
-	m_xmf3_Gravity = DirectX::XMFLOAT3(0.0f, -10.0f, 0.0f);
-	m_fMax_Velocity = 25.0f;
-	m_fMax_Gravity = 75.0f;
-	m_fFriction = 2000.0f;
+	m_xmf3_Gravity = DirectX::XMFLOAT3(0.0f, -PLAYER_GRAVITY, 0.0f);
+	m_fMax_Velocity = PLAYER_MAX_VELOCITY;
+	m_fMax_Gravity = PLAYER_MAX_GRAVITY;
+	m_fFriction = PLAYER_FRICTION;
 
 	m_xmf3_Calculated_Vel = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
 
@@ -32,24 +32,6 @@ CPlayer::CPlayer() {
 
 	m_pPlayer_Udt_Context = NULL;
 	m_pCamera_Udt_Context = NULL;
-
-
-	int i = 0;
-
-	m_nObjects = (CUBE_INIT_RING_NUMBER * 2 + 1) * (CUBE_INIT_RING_NUMBER * 2 + 1);
-
-	m_ppObjects = new CObject * [CUBE_MAX_NUMBER] { NULL };
-
-	CObject* pObject = NULL;
-
-	for (int x = -CUBE_INIT_RING_NUMBER; x <= CUBE_INIT_RING_NUMBER; ++x) {
-		for (int z = -CUBE_INIT_RING_NUMBER; z <= CUBE_INIT_RING_NUMBER; ++z) {
-			pObject = new CObject();
-			pObject->Set_Position(CUBE_WIDTH * x, 0.0f, CUBE_WIDTH * z);
-			//pObject->Set_Color(CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, 0.0f);
-			m_ppObjects[i++] = pObject;
-		}
-	}
 }
 
 CPlayer::~CPlayer() {
@@ -57,35 +39,34 @@ CPlayer::~CPlayer() {
 }
 
 void CPlayer::Move(int PlayerNumber, float fDistance, bool bVelocity) {
+	m_bAble_2_Jump = false;
 
 	DirectX::XMFLOAT3 xmf3_Shift = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
 
-	if (GetKeyBuffer(PlayerNumber, VK_W)) {
+	if (GetKeyBuffer(PlayerNumber, CUSTOM_VK_W)) {
 		xmf3_Shift = Vector3::Add(xmf3_Shift, m_xmf3_Look, fDistance);
 	}
-	if (GetKeyBuffer(PlayerNumber, VK_S)) {
+	if (GetKeyBuffer(PlayerNumber, CUSTOM_VK_S)) {
 		xmf3_Shift = Vector3::Add(xmf3_Shift, m_xmf3_Look, -fDistance);
 	}
-	if (GetKeyBuffer(PlayerNumber, VK_D)) {
+	if (GetKeyBuffer(PlayerNumber, CUSTOM_VK_D)) {
 		xmf3_Shift = Vector3::Add(xmf3_Shift, m_xmf3_Right, fDistance);
 	}
-	if (GetKeyBuffer(PlayerNumber, VK_A)) {
+	if (GetKeyBuffer(PlayerNumber, CUSTOM_VK_A)) {
 		xmf3_Shift = Vector3::Add(xmf3_Shift, m_xmf3_Right, -fDistance);
 	}
 
-
-	if (m_bAble_2_Jump) {
-		if (GetKeyBuffer(PlayerNumber, VK_SPACE)) {
+	if (check_able_Jump) {
+		if (GetKeyBuffer(PlayerNumber, CUSTOM_VK_SPACE)) {
+			m_bAble_2_Jump = true;
+			SetKeyBuffer(PlayerNumber, CUSTOM_VK_SPACE, false);
 			m_xmf3_Velocity.y = 0.0f;
 			xmf3_Shift = Vector3::Add(xmf3_Shift, m_xmf3_Up, fDistance * CUBE_WIDTH * 1.5f);
 		}
-
-		m_bAble_2_Jump = false;
 	}
 
 	Move(xmf3_Shift, bVelocity);
 
-	
 }
 
 void CPlayer::Move(DirectX::XMFLOAT3& xmf3_Shift, bool bVelocity) {
@@ -106,17 +87,15 @@ void CPlayer::Move(float fOffset_x, float fOffset_y, float fOffset_z) {
 
 void CPlayer::Update(int PlayerNumber, float fElapsed_Time) {
 	m_xmf3_Velocity = Vector3::Add(m_xmf3_Velocity, Vector3::Multiply(m_xmf3_Gravity, fElapsed_Time, false));
-	/*printf("%f\n", m_xmf3_Velocity.y);
-	printf("elapsed time - %f\n", fElapsed_Time);*/
 	float fLength = sqrtf(m_xmf3_Velocity.x * m_xmf3_Velocity.x + m_xmf3_Velocity.z * m_xmf3_Velocity.z);
-	float fMax_Velocity = m_fMax_Velocity * fElapsed_Time;
+	//float fMax_Velocity = m_fMax_Velocity * fElapsed_Time;
 
 	if (fLength > m_fMax_Velocity) {
 		m_xmf3_Velocity.x *= (m_fMax_Velocity / fLength);
 		m_xmf3_Velocity.z *= (m_fMax_Velocity / fLength);
 	}
 
-	float fMax_Gravity = m_fMax_Gravity * fElapsed_Time;
+	//float fMax_Gravity = m_fMax_Gravity * fElapsed_Time;
 	fLength = sqrtf(m_xmf3_Velocity.y * m_xmf3_Velocity.y);
 
 	if (fLength > m_fMax_Gravity) {
@@ -141,18 +120,19 @@ void CPlayer::Update(int PlayerNumber, float fElapsed_Time) {
 	//
 	DirectX::XMFLOAT3 xmf3_Friction = Vector3::Add(m_xmf3_Velocity, Vector3::Multiply(m_xmf3_Velocity, -fDeceleration, true));
 
-	/*m_xmf3_Velocity.x = xmf3_Friction.x;
-	m_xmf3_Velocity.z = xmf3_Friction.z;*/
+	m_xmf3_Velocity.x = xmf3_Friction.x;
+	m_xmf3_Velocity.z = xmf3_Friction.z;
 
-	if (m_bAble_2_Jump) {
-		m_xmf3_Velocity.x = xmf3_Friction.x;
-		m_xmf3_Velocity.z = xmf3_Friction.z;
+	// 바닥에 닿아 있을시만 점프 가능하게
+	if (m_xmf3_Velocity.y)
+	{
+		check_able_Jump = false;
 	}
 
-	//Prepare_Render();
+	Prepare_Render();
 }
 
-void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects) {
+void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects, int PlayerNumber) {
 	DirectX::XMFLOAT3 xmf3_Player_Position = Get_Position();
 	DirectX::XMFLOAT3 xmf3_Cube_Position = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
 	float fLength = 0.0f;
@@ -187,6 +167,8 @@ void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects) {
 
 			if (m_xmf3_Calculated_Vel.y < 0) {
 				m_xmf4x4_World._42 = m_xmf3_Position.y = xmf3_Object_Position.y + CUBE_WIDTH / 2 + PLAYER_HEIGHT / 2 + PLAYER_COLLISION_OFFSET;
+
+				check_able_Jump = true;
 			}
 			else {
 				m_xmf4x4_World._42 = m_xmf3_Position.y = xmf3_Object_Position.y - CUBE_WIDTH / 2 - PLAYER_HEIGHT / 2 - PLAYER_COLLISION_OFFSET;

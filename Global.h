@@ -16,9 +16,9 @@
 	
 
 
-#define VK_W 87
-#define VK_A 65
-#define VK_S 83
-#define VK_D 68
-#define VK_SPACE 32
-#define VK_LSHIFT 16
+#define CUSTOM_VK_W 87
+#define CUSTOM_VK_A 65
+#define CUSTOM_VK_S 83
+#define CUSTOM_VK_D 68
+#define CUSTOM_VK_SPACE 32
+#define CUSTOM_VK_LSHIFT 16

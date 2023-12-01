@@ -4,12 +4,12 @@
 #include "Global.h"
 
 
-#define DIRECT_FORWARD 0x01
-#define DIRECT_BACKWARD 0x02
-#define DIRECT_LEFT 0x04
-#define DIRECT_RIGHT 0x08
-#define DIRECT_UP 0x010
-#define DIRECT_DOWN 0x20
+#define PLAYER_MAX_VELOCITY 75.0f
+#define PLAYER_MAX_GRAVITY 75.0f
+#define PLAYER_GRAVITY 100.0f
+#define PLAYER_FRICTION 500.0f
+#define PLAYER_MOVE_DISTANCE 200.0f
+#define PLAYER_PICKING_DISTANCE 100.0f
 
 #define PLAYER_COLLISION_LENGTH 20.0f
 #define PLAYER_COLLISION_OFFSET 0.001f
@@ -19,8 +19,6 @@
 
 class CPlayer : public CObject {
 protected:
-	CObject** m_ppObjects = NULL;
-	int m_nObjects = 0;
 
 	DirectX::XMFLOAT3 m_xmf3_Position;
 	DirectX::XMFLOAT3 m_xmf3_Right;
@@ -47,6 +45,7 @@ protected:
 
 	//
 	bool m_bAble_2_Jump = false;
+	bool check_able_Jump = false;
 
 public:
 	CPlayer();
@@ -88,7 +87,7 @@ public:
 
 	//
 	//virtual void Prcs_Collision(CObject* pObject);
-	virtual void Udt_N_Prcs_Collision(CObject** ppObject, int nObjects);
+	virtual void Udt_N_Prcs_Collision(CObject** ppObject, int nObjects, int PlayerNumber);
 	void Prepare_Render();
 };
 

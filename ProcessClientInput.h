@@ -5,10 +5,10 @@
 #include <vector>
 
 
-#define PLAYER_MOVE_DISTANCE 100.0f
 
-void ProcessClientInput(float ElapsedTime);
-void PlayerMove(int PlayerNumber, ULONG dwDirection, float fDistance,bool bVelocity);
+
+//void ProcessClientInput(float ElapsedTime);
+//void PlayerMove(int PlayerNumber, ULONG dwDirection, float fDistance,bool bVelocity);
 
 // about calculate
 namespace Vector3 {
