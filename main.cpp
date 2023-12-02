@@ -220,16 +220,15 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 	int retval;
 	while(1)
 	{
-		
+		if (remainingSeconds <= 0) {
+			break;
+		}
 		retval = recv(ClientKeyInputSocket, (char*)&clientKeyInput, sizeof(clientKeyInput), 0);
 		if (retval == SOCKET_ERROR||(clientKeyInput.Key<0 || clientKeyInput.Key>256)) {
-			closesocket(ClientKeyInputSocket);
 			break;
 		}
 		if(!clientKeyInput.KeyDown && (clientKeyInput.Key==27||clientKeyInput.Key==0))
 		{
-			//종료한 상황으로 확인됨
-			closesocket(ClientKeyInputSocket);
 			break;
 		}
 		printf("%d 플레이어가 %d 버튼 ", clientKeyInput.PlayerNumber, clientKeyInput.Key);
@@ -244,7 +243,7 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 			printf("뗌\n");
 		}
 	}
-
+	closesocket(ClientKeyInputSocket);
 	printf("클라이언트 키 인풋은 잘 지워짐\n");
 	return 0;
 }

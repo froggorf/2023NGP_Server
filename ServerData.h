@@ -7,13 +7,8 @@
 #include "Global.h"
 #include "Player.h"
 
-CPlayer* vPlayer = new CPlayer[MAXPLAYERCOUNT];
 
-//CCube_Player* pCube_Player = new CCube_Player();
-CObject** ppObjects;
-int nObjects;
-
-// 구조체
+// ========================== 구조체 및 클래스 ==========================
 extern struct Player_Info{
 	float fPosition_x, fPosition_y, fPosition_z;
 	float fLook_x, fLook_z;
@@ -51,17 +46,23 @@ public:
 	char chatData[CHATMAXBUFFER+1]={0,};
 };
 
-// 변수
-//int Cube_num = 0;												// 설치된 큐브 개수
-int Current_Player_Count = 0;										// 접속한 플레이어 인원 수 
-struct sockaddr_in clientAddr[MAXPLAYERCOUNT];					// 클라이언트 주소 정보
+// ========================== 함수 ==========================
 
-//std::vector<Player_Info*> Player_Info;							// 플레이어 정보
-extern struct Player_Info Player_Info[MAXPLAYERCOUNT];
 
-std::vector<SOCKET> socket_vector;								// 각 쓰레드에서 얻은 소켓 정보(TCP, time)
+
+// ========================== 변수 ==========================
+CPlayer* vPlayer = new CPlayer[MAXPLAYERCOUNT];
+
+//CCube_Player* pCube_Player = new CCube_Player();
+CObject** ppObjects;
+int nObjects;
+
+int Current_Player_Count = 0;									// 현재 접속한 플레이어 인원 수 
+struct sockaddr_in clientAddr[MAXPLAYERCOUNT];					// 클라이언트 주소 정보					
+extern struct Player_Info Player_Info[MAXPLAYERCOUNT];			// 플레이어 정보(위치, 룩벡터) 배열
+
+std::vector<SOCKET> socket_vector;								// 시간 정보 전송 소켓
 std::vector<Cube_Info> Total_Cube;								// 전체 큐브 정보
-std::vector<SOCKET> socket_Cube_vector;							// 각 쓰레드에서 얻은 소켓 정보(TCP, Cube)
-
-std::vector<SOCKET> socket_SendPlayerData_vector;
-std::vector<SOCKET> socket_chat_vector;
+std::vector<SOCKET> socket_Cube_vector;							// 큐브 설치 정보 수신 받아 모든 클라에게 전송하는 소켓
+std::vector<SOCKET> socket_SendPlayerData_vector;				// 플레이어 정보(위치, 룩벡터) 전송 소켓
+std::vector<SOCKET> socket_chat_vector;							// 채팅 정보 받아 Echo 하는 소켓
