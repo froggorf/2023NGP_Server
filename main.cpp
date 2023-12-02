@@ -187,9 +187,6 @@ void InitGame()
 	g_startTime = g_prevTime = timeGetTime();
 	remainingSeconds = GAMETIME-1;
 
-	// 큐브 데이터 초기화
-	Total_Cube.clear();
-
 	// 모든 소켓 초기화
 	ClearAllSocket();
 
@@ -275,6 +272,7 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 	printf("클라이언트 키 인풋은 잘 지워짐\n");
 	return 0;
 }
+
 void CreateChatThread(SOCKET& chat_listen_sock)
 {
 	SOCKET client_sock;
@@ -308,6 +306,7 @@ void CreateChatThread(SOCKET& chat_listen_sock)
 	if (hThread == NULL) { closesocket(client_sock); }
 	else { CloseHandle(hThread); }
 }
+
 DWORD WINAPI ProcessEchoChat(LPVOID arg)
 {
 	printf("채팅 쓰레드 시작\n");
@@ -835,7 +834,7 @@ void LoginPlayer(SOCKET& login_listen, SOCKET& keyinput_listen, SOCKET& cube_lis
 		CreateChatThread(chat_listen);
 	}
 
-	Total_Cube.clear();
+	Request_Delete_All_Cube();
 	Player_Info[0].fPosition_x = 75.0f; Player_Info[0].fPosition_y = 50.0f; Player_Info[0].fPosition_z = 0.0f;
 	Player_Info[1].fPosition_x = 0.0f; Player_Info[1].fPosition_y = 50.0f; Player_Info[1].fPosition_z = 0.0f;
 	Player_Info[2].fPosition_x = 0.0f; Player_Info[2].fPosition_y = 50.0f; Player_Info[2].fPosition_z = -75.0f;
@@ -871,6 +870,9 @@ void Set_Floor_Cube_Object()
 
 void Release_Floor_Cube_Object()
 {
+	// 큐브 데이터 초기화
+	Total_Cube.clear();
+
 	if (nObjects)	nObjects = 0;
 	if (ppObjects != NULL)
 	{
@@ -931,7 +933,12 @@ void Delete_Cube(Cube_Info clientCubeInput)
 
 void Request_Delete_All_Cube() 
 {
-	for (auto p : Total_Cube)
-		Delete_Cube(p);
-	Release_Floor_Cube_Object();
+	// 현재 맵에 놓여있는 모든 큐브 정보 전송
+	for (auto socket : socket_Cube_vector) {
+		for (auto cube : Total_Cube)
+		{
+			cube.AddorDelete = false;
+			send(socket, (char*)&cube, sizeof(cube), 0);
+		}
+	}
 }
