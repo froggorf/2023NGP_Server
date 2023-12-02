@@ -157,7 +157,7 @@ void InitGame()
 
 	// 게임 시간 초기화
 	g_startTime = g_prevTime = timeGetTime();
-	remainingSeconds = GAMETIME;
+	remainingSeconds = GAMETIME-1;
 
 	// 큐브 데이터 초기화
 	Total_Cube.clear();
@@ -367,19 +367,23 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		
 		//플레이어 이동로직 
 		// 플레이어 충돌체크 및 움직임 갱신
-		for (int i = 0; i < MAXPLAYERCOUNT; ++i)
+		if(remainingSeconds <= GAMETIME)
 		{
-			vPlayer[i].Set_Look_Vector(DirectX::XMFLOAT3(Player_Info[i].fLook_x, 0, Player_Info[i].fLook_z));
-			vPlayer[i].Set_Right_Vector(vPlayer[i].Get_Look_Vector());
-					
-			vPlayer[i].Move(i, PLAYER_MOVE_DISTANCE * ElapsedTimeInSec, true);
-			vPlayer[i].Update(i, ElapsedTimeInSec);
-			vPlayer[i].Udt_N_Prcs_Collision(ppObjects, nObjects, i);
+			for (int i = 0; i < MAXPLAYERCOUNT; ++i)
+			{
+				vPlayer[i].Set_Look_Vector(DirectX::XMFLOAT3(Player_Info[i].fLook_x, 0, Player_Info[i].fLook_z));
+				vPlayer[i].Set_Right_Vector(vPlayer[i].Get_Look_Vector());
 
-			Player_Info[i].fPosition_x = vPlayer[i].Get_Position().x;
-			Player_Info[i].fPosition_y = vPlayer[i].Get_Position().y;
-			Player_Info[i].fPosition_z = vPlayer[i].Get_Position().z;
+				vPlayer[i].Move(i, PLAYER_MOVE_DISTANCE * ElapsedTimeInSec, true);
+				vPlayer[i].Update(i, ElapsedTimeInSec);
+				vPlayer[i].Udt_N_Prcs_Collision(ppObjects, nObjects, i);
+
+				Player_Info[i].fPosition_x = vPlayer[i].Get_Position().x;
+				Player_Info[i].fPosition_y = vPlayer[i].Get_Position().y;
+				Player_Info[i].fPosition_z = vPlayer[i].Get_Position().z;
+			}
 		}
+		
 		
 
 		//플레이어 정보 모두 전송
@@ -551,7 +555,7 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 }
 
 DWORD WINAPI Send_Game_Time(LPVOID arg) {
-	remainingSeconds = GAMETIME;
+	remainingSeconds = GAMETIME + 3;
 	std::cout << "시간 쓰레드 시작" << std::endl;
 	// 시간 데이터 보내기
 	while (true)
@@ -798,6 +802,15 @@ void LoginPlayer(SOCKET& login_listen, SOCKET& keyinput_listen, SOCKET& cube_lis
 		CreateSendPlayerDataThread(playerdata_listen);
 		CreateChatThread(chat_listen);
 	}
+
+	Total_Cube.clear();
+	Player_Info[0].fPosition_x = 75.0f; Player_Info[0].fPosition_y = 50.0f; Player_Info[0].fPosition_z = 0.0f;
+	Player_Info[1].fPosition_x = 0.0f; Player_Info[1].fPosition_y = 50.0f; Player_Info[1].fPosition_z = 0.0f;
+	Player_Info[2].fPosition_x = 0.0f; Player_Info[2].fPosition_y = 50.0f; Player_Info[2].fPosition_z = -75.0f;
+	vPlayer[0].Set_Position(DirectX::XMFLOAT3(75.0f, 50.0f, 0.0f));
+	vPlayer[1].Set_Position(DirectX::XMFLOAT3(0.0f,50.0f,0.0f));
+	vPlayer[2].Set_Position(DirectX::XMFLOAT3(0.0f,50.0f,-75.0f));
+
 	// 소켓 닫기
 	closesocket(login_listen);
 	closesocket(keyinput_listen);
