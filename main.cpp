@@ -114,21 +114,47 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 		return;
 	}
 
-	// PlayerNumber 전달
-	send(client_sock, (char*)&Current_Player_Count, sizeof(Current_Player_Count), 0);
 	// 시간 통신용 소켓 벡터에 저장
-	socket_vector.push_back(client_sock);
-	// 클라이언트 주소 변수에 추가 
-	clientAddr[Current_Player_Count] = clientaddr;
+	if(socket_vector.size() > Current_Player_Count)		// 게임 시작 전 로그아웃 한 기록이 남아있는 것
+	{
+		for(int i=0; i<socket_vector.size(); ++i)
+		{
+			if (socket_vector[i] == INVALID_SOCKET) {
+				printf("의도대로 추가 잘됨-1\n");
+				// PlayerNumber 전달
+				send(client_sock, (char*)&i, sizeof(Current_Player_Count), 0);
+				socket_vector[i] = client_sock;
+				Player_Info[i].fPosition_x = 0.0f; Player_Info[i].fPosition_y = 50.0f; Player_Info[i].fPosition_z = 0.0f;
+				vPlayer[i].Set_Position(DirectX::XMFLOAT3(0.0f, 50.0f, 0.0f));
+				Player_Info[i].fLook_x = 0.0f; Player_Info[i].fLook_z = 1.0f;
+				vPlayer[i].Set_Look_Vector(DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f));
+				// 클라이언트 주소 변수에 추가 
+				clientAddr[i] = clientaddr;
 
-	Player_Info[Current_Player_Count].fPosition_x = 0.0f;
-	Player_Info[Current_Player_Count].fPosition_y = 50.0f;
-	Player_Info[Current_Player_Count].fPosition_z = 0.0f;
-
-	vPlayer[Current_Player_Count].Set_Position(DirectX::XMFLOAT3(0.0f, 50.0f, 0.0f));
+				EnterCriticalSection(&cs_for_logout);
+				bPlayerLogout[i] = false;
+				LeaveCriticalSection(&cs_for_logout);
+				break;
+			}
+		}
+	}
+	else
+	{
+		// PlayerNumber 전달
+		send(client_sock, (char*)&Current_Player_Count, sizeof(Current_Player_Count), 0);
+		socket_vector.push_back(client_sock);
+		Player_Info[Current_Player_Count].fPosition_x = 0.0f;
+		Player_Info[Current_Player_Count].fPosition_y = 50.0f;
+		Player_Info[Current_Player_Count].fPosition_z = 0.0f;
+		vPlayer[Current_Player_Count].Set_Position(DirectX::XMFLOAT3(0.0f, 50.0f, 0.0f));
+		// 클라이언트 주소 변수에 추가 
+		clientAddr[Current_Player_Count] = clientaddr;
+	}
+	
 
 	// 플레이어 수 증가
 	Current_Player_Count += 1;
+
 
 	// 접속한 클라이언트 정보 출력
 	char addr[INET_ADDRSTRLEN];
@@ -259,8 +285,21 @@ void CreateChatThread(SOCKET& chat_listen_sock)
 		err_display("CreateClientKeyInputThread() - accept()");
 		return;
 	}
-
-	socket_chat_vector.push_back(client_sock);
+	if (socket_chat_vector.size() >= Current_Player_Count)		// 게임 시작 전 로그아웃 한 기록이 남아있는 것
+	{
+		for (int i = 0; i < socket_chat_vector.size(); ++i)
+		{
+			if (socket_chat_vector[i] == INVALID_SOCKET) {
+				printf("의도대로 추가 잘됨-4\n");
+				socket_chat_vector[i] = client_sock;
+				break;
+			}
+		}
+	}
+	else
+	{
+		socket_chat_vector.push_back(client_sock);
+	}
 
 	HANDLE hThread = CreateThread(NULL, 0, ProcessEchoChat,
 		(LPVOID)client_sock, 0, NULL);
@@ -325,8 +364,21 @@ void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
 		err_display("CreateSendPlayerDataThread() - accept()");
 		return;
 	}
-	socket_SendPlayerData_vector.push_back(client_sock);
-
+	if (socket_SendPlayerData_vector.size() >= Current_Player_Count)		// 게임 시작 전 로그아웃 한 기록이 남아있는 것
+	{
+		for (int i = 0; i < socket_SendPlayerData_vector.size(); ++i)
+		{
+			if (socket_SendPlayerData_vector[i] == INVALID_SOCKET) {
+				printf("의도대로 추가 잘됨-3\n");
+				socket_SendPlayerData_vector[i] = client_sock;
+				break;
+			}
+		}
+	}
+	else
+	{
+		socket_SendPlayerData_vector.push_back(client_sock);
+	}
 
 }
 
@@ -418,7 +470,22 @@ void CreateCubeThread(SOCKET& Cube_listen_sock)
 		err_display("CreateCubeThread() - accept()");
 		return;
 	}
-	socket_Cube_vector.push_back(client_sock);
+
+	if (socket_Cube_vector.size() >= Current_Player_Count)		// 게임 시작 전 로그아웃 한 기록이 남아있는 것
+	{
+		for (int i = 0; i < socket_Cube_vector.size(); ++i)
+		{
+			if (socket_Cube_vector[i] == INVALID_SOCKET) {
+				printf("의도대로 추가 잘됨-2\n");
+				socket_Cube_vector[i] = client_sock;
+				break;
+			}
+		}
+	}
+	else
+	{
+		socket_Cube_vector.push_back(client_sock);
+	}
 
 	// 현재 맵에 놓여있는 모든 큐브 정보 전송
 	for(const auto cube : Total_Cube)
@@ -680,6 +747,11 @@ bool PlayerLogout(int playerNumber)
 		// 현재 플레이어 수 줄이기
 		Current_Player_Count -= 1;
 		printf("%d 명의 플레이어만 남음\n",Current_Player_Count);
+
+		Player_Info[playerNumber].fPosition_x = 0.0f; Player_Info[playerNumber].fPosition_y = -50.0f; Player_Info[playerNumber].fPosition_z = 0.0f;
+		vPlayer[playerNumber].Set_Position(DirectX::XMFLOAT3(0.0f, -50.0f, 0.0f));
+		Player_Info[playerNumber].fLook_x = 0.0f; Player_Info[playerNumber].fLook_z = 1.0f;
+		vPlayer[playerNumber].Set_Look_Vector(DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f));
 		
 	}
 	LeaveCriticalSection(&cs_for_logout);
