@@ -9,45 +9,59 @@
 #include <Mmsystem.h>
 #pragma comment(lib, "winmm.lib")
 
-// TODO: 마지막날 출력 관련(printf, cout) 모두 제거할 예정
 
-// ========================== 함수 ==========================
-void CreateListenSockets(SOCKET&, SOCKET&, SOCKET&, SOCKET&, SOCKET&);			// 리슨 소켓 생성
-void InitGame();																// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할 수 있도록 구현 예정
-void LoginPlayer(SOCKET&, SOCKET&, SOCKET&, SOCKET&, SOCKET&);					// listen_sock accept 및 쓰레드 생성 함수
-void ConnectAndAddPlayer(SOCKET&);												// 처음 접속시 플레이어에 대한 정보 전송 및 시간 전송 소켓 생성
-void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock);					// 플레이어 마다 키 인풋 정보 수신 받는 소켓 및 쓰레드 생성
+// 함수
+void CreateListenSockets(SOCKET&, SOCKET&, SOCKET&, SOCKET&, SOCKET&);
+void ConnectAndAddPlayer(SOCKET&);
+void InitGame();						// 게임 데이터 초기화 부분, 재시작 시 다시 호출하여 실행할 수 있도록 구현 예정
+void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock);
 VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime); 	// 시간 업데이트 함수
 void Send_Game_Time();
-DWORD WINAPI ProcessClientKeyInput(LPVOID arg);									// 플레이어의 키 입력 정보 송신받아 키 버퍼 갱신
-void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock);					// 플레이어 정보(위치,룩벡터) 전송 소켓 생성
-DWORD WINAPI SendPlayerDataToClient(LPVOID arg);								// 메인 작업 쓰레드, 플레이어 이동 - 충돌체크 - 모든 클라에게 모든 플레이어 위치 전송
-void CreateChatThread(SOCKET& chat_listen_sock);								// 채팅 소켓 및 쓰레드 생성
-DWORD WINAPI ProcessEchoChat(LPVOID arg);										// 채팅 정보 수신 받아 모든 클라에게 전송하는 함수
+int remainingSeconds = GAMETIME; // 5분을 초로 환산
+
+HWND timerHWND;
+
+// 키 인풋 받아 처리하는 쓰레드
+DWORD WINAPI ProcessClientKeyInput(LPVOID arg);
+
+// 플레이어 정보 전송하는 쓰레드
+void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock);
+DWORD WINAPI SendPlayerDataToClient(LPVOID arg);
+
+// 채팅 서버 생성 쓰레드
+void CreateChatThread(SOCKET& chat_listen_sock);
+DWORD WINAPI ProcessEchoChat(LPVOID arg);
+
 void CreateCubeThread(SOCKET& Cube_listen_sock);
 DWORD WINAPI EchoClientRequestCube(LPVOID arg);
 bool Check_Add_Cube(Cube_Info cube);
+
 bool CompareXMFLOAT3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b);
-void ClearAllSocket();															// 게임 초기화 시 모든 소켓 정보 초기화
-bool PlayerLogout(int playerNumber);											// 플레이어가 게임 진행중 게임을 종료해 서버에서 나갔을 때 함수
 
-// ========================== 변수 ==========================
+// 윈속 변수
+WSADATA wsa;
 
-WSADATA wsa;																	// 윈속
-int remainingSeconds = GAMETIME;												// 게임 시간 
-HWND timerHWND;																	// 타이머 핸들
-DWORD g_startTime;																// ElapsedTime 관련
+// ElapsedTime 관련
+DWORD g_startTime;
 DWORD g_prevTime;
-CRITICAL_SECTION cs_for_logout;													// PlayerLogout(int) 내부 bool bPlayerLogout[] 사용을 위한 cs
-bool bPlayerLogout[MAXPLAYERCOUNT] = { false, };								// 로그아웃 중복 처리 방지 변수
+
+// 게임 초기화 시 모든 소켓 정보 초기화하는 함수
+void ClearAllSocket();
+
+// 플레이어가 게임 진행중 게임을 종료해 서버에서 나갔을 때 함수
+bool PlayerLogout(int playerNumber);
+CRITICAL_SECTION cs_for_logout;
+bool bPlayerLogout[MAXPLAYERCOUNT] = { false, };
+
 
 int main(int argc, char *argv[])
 {
 	int retval;
+
 	
+
 	while(true)
 	{
-		// TODO: 민혁씨 요거 함수화 부탁드려용 delete도
 		nObjects = (CUBE_INIT_RING_NUMBER * 2 + 1) * (CUBE_INIT_RING_NUMBER * 2 + 1);
 		ppObjects = new CObject * [CUBE_MAX_NUMBER] { NULL };
 
@@ -63,52 +77,73 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		// 리슨 소켓 생성
+		//소켓 생성
 		SOCKET login_listen, keyinput_listen, cube_listen, playerdata_listen, chat_listen;
 		CreateListenSockets(login_listen, keyinput_listen, cube_listen, playerdata_listen, chat_listen);
 		
+
+		
 		// 게임 데이터 초기화
 		InitGame();
-
-		//플레이어 데이터 전송 쓰레드 미리 실행시키기
-		HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
-			(LPVOID)0, 0, NULL);
-		CloseHandle(hThread);
-
+		
 		// 플레이어 지정한 수 인원 접속시키기
-		LoginPlayer(login_listen, keyinput_listen, cube_listen, playerdata_listen, chat_listen);
+		while (Current_Player_Count != MAXPLAYERCOUNT) {
+			ConnectAndAddPlayer(login_listen);
+			CreateClientKeyInputThread(keyinput_listen);
+			CreateCubeThread(cube_listen);
+			CreateSendPlayerDataThread(playerdata_listen);
+			CreateChatThread(chat_listen);
+		}
+		// 소켓 닫기
+		closesocket(login_listen);
+		closesocket(keyinput_listen);
+		closesocket(cube_listen);
+		closesocket(playerdata_listen);
+		closesocket(chat_listen);
+
+
+
+		// TODO: 게임 시작 되므로 게임 시작 관련 스레드 제작 예정
 
 		// 타이머 초기화
 		SetTimer(timerHWND, TIMER_ID, 1000, TimerProc); // 1000ms(1초)마다 타이머 호출
 		std::cout << "타이머 시작 - " << remainingSeconds << std::endl;
 
+		// 플레이어의 키 인풋 정보를 받는 쓰레드 생성
 
+		// TODO: while문으로 main 쓰레드에서는 중력, 충돌체크 및 시간 전송 등이 진행되도록 구현 예정
 		bool bGame = true;
 		while (bGame) {
 			// 시간 처리를 위한 메세지 루프
 			MSG msg;
 			while (GetMessage(&msg, NULL, 0, 0)) {
-				// 현재 플레이어 인원 체크 및 없을 경우 종료
+				// 서버 종료
 				if (Current_Player_Count == 0)
 				{
 					printf("모든 플레이어 종료를 확인함\n");
 					bGame = false;
 					break;
 				}
+				
+
 				TranslateMessage(&msg);
 				DispatchMessage(&msg);
+				
 			}
+			
+
 		}
 
 		printf("서버 종료를 확인함 다시 while 돌리면 됨\n");
-
-		// TODO: 현재는 InitGame()으로 종료 초기화 진행, 필요시 EndGame() 만들기.
 		InitGame();
-		
+		// TODO: EndGame() 로직 만들기.
 
 
 	}
-	
+	// 소켓 닫기
+	//closesocket(listen_sock);
+
+
 	// 윈속 종료
 	WSACleanup();
 	return 0;
@@ -206,6 +241,10 @@ void InitGame()
 
 	KillTimer(timerHWND, TIMER_ID);
 
+	//플레이어 데이터 전송 쓰레드 미리 실행시키기
+	HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
+		(LPVOID)0, 0, NULL);
+	CloseHandle(hThread);
 }
 
 void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
@@ -702,7 +741,7 @@ void CreateListenSockets(SOCKET& login_listen_sock, SOCKET& KeyInput_listen_sock
 	//----------------로그인 소켓 만드는 과정----------------   //TODO: 아래꺼랑 합쳐서 함수화 처리 예정
 	int retval;
 
-	// 윈속 초기화
+		// 윈속 초기화
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 		return;
 
@@ -799,22 +838,4 @@ void CreateListenSockets(SOCKET& login_listen_sock, SOCKET& KeyInput_listen_sock
 	// listen()
 	if (listen(echo_chat_listen_sock, SOMAXCONN)
 		== SOCKET_ERROR) err_quit("listen()");
-
-}
-
-void LoginPlayer(SOCKET& login_listen, SOCKET& keyinput_listen, SOCKET& cube_listen, SOCKET& playerdata_listen, SOCKET& chat_listen)
-{
-	while (Current_Player_Count != MAXPLAYERCOUNT) {
-		ConnectAndAddPlayer(login_listen);
-		CreateClientKeyInputThread(keyinput_listen);
-		CreateCubeThread(cube_listen);
-		CreateSendPlayerDataThread(playerdata_listen);
-		CreateChatThread(chat_listen);
-	}
-	// 소켓 닫기
-	closesocket(login_listen);
-	closesocket(keyinput_listen);
-	closesocket(cube_listen);
-	closesocket(playerdata_listen);
-	closesocket(chat_listen);
 }
