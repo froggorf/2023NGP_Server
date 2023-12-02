@@ -17,8 +17,7 @@ void InitGame();																// °ÔÀÓ µ¥ÀÌÅÍ ÃÊ±âÈ­ ºÎºĞ, Àç½ÃÀÛ ½Ã ´Ù½Ã È£ÃâÇ
 void LoginPlayer(SOCKET&, SOCKET&, SOCKET&, SOCKET&, SOCKET&);					// listen_sock accept ¹× ¾²·¹µå »ı¼º ÇÔ¼ö
 void ConnectAndAddPlayer(SOCKET&);												// Ã³À½ Á¢¼Ó½Ã ÇÃ·¹ÀÌ¾î¿¡ ´ëÇÑ Á¤º¸ Àü¼Û ¹× ½Ã°£ Àü¼Û ¼ÒÄÏ »ı¼º
 void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock);					// ÇÃ·¹ÀÌ¾î ¸¶´Ù Å° ÀÎÇ² Á¤º¸ ¼ö½Å ¹Ş´Â ¼ÒÄÏ ¹× ¾²·¹µå »ı¼º
-VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime); 	// ½Ã°£ ¾÷µ¥ÀÌÆ® ÇÔ¼ö
-void Send_Game_Time();
+DWORD WINAPI Send_Game_Time(LPVOID arg);										// ½Ã°£ ¾÷µ¥ÀÌÆ® ÇÔ¼ö
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg);									// ÇÃ·¹ÀÌ¾îÀÇ Å° ÀÔ·Â Á¤º¸ ¼Û½Å¹Ş¾Æ Å° ¹öÆÛ °»½Å
 void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock);					// ÇÃ·¹ÀÌ¾î Á¤º¸(À§Ä¡,·èº¤ÅÍ) Àü¼Û ¼ÒÄÏ »ı¼º
 DWORD WINAPI SendPlayerDataToClient(LPVOID arg);								// ¸ŞÀÎ ÀÛ¾÷ ¾²·¹µå, ÇÃ·¹ÀÌ¾î ÀÌµ¿ - Ãæµ¹Ã¼Å© - ¸ğµç Å¬¶ó¿¡°Ô ¸ğµç ÇÃ·¹ÀÌ¾î À§Ä¡ Àü¼Û
@@ -30,6 +29,9 @@ bool Check_Add_Cube(Cube_Info cube);
 bool CompareXMFLOAT3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b);
 void ClearAllSocket();															// °ÔÀÓ ÃÊ±âÈ­ ½Ã ¸ğµç ¼ÒÄÏ Á¤º¸ ÃÊ±âÈ­
 bool PlayerLogout(int playerNumber);											// ÇÃ·¹ÀÌ¾î°¡ °ÔÀÓ ÁøÇàÁß °ÔÀÓÀ» Á¾·áÇØ ¼­¹ö¿¡¼­ ³ª°¬À» ¶§ ÇÔ¼ö
+void Set_Floor_Cube_Object();													// ¹Ù´Ú ¿ÀºêÁ§Æ® ¼³Á¤
+void Release_Floor_Cube_Object();												// ÀüÃ¼ ¿ÀºêÁ§Æ® ÃÊ±âÈ­
+
 
 // ========================== º¯¼ö ==========================
 
@@ -47,21 +49,10 @@ int main(int argc, char *argv[])
 	
 	while(true)
 	{
-		// TODO: ¹ÎÇõ¾¾ ¿ä°Å ÇÔ¼öÈ­ ºÎÅ¹µå·Á¿ë deleteµµ
-		nObjects = (CUBE_INIT_RING_NUMBER * 2 + 1) * (CUBE_INIT_RING_NUMBER * 2 + 1);
-		ppObjects = new CObject * [CUBE_MAX_NUMBER] { NULL };
-
-		int c_i = 0;
-		CObject* pObject = NULL;
-
-		for (int x = -CUBE_INIT_RING_NUMBER; x <= CUBE_INIT_RING_NUMBER; ++x) {
-			for (int z = -CUBE_INIT_RING_NUMBER; z <= CUBE_INIT_RING_NUMBER; ++z) {
-				pObject = new CObject();
-				pObject->Set_Position(CUBE_WIDTH * x, 0.0f, CUBE_WIDTH * z);
-				//pObject->Set_Color(CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, CUBE_DEFAULT_COLOR, 0.0f);
-				ppObjects[c_i++] = pObject;
-			}
-		}
+		// Å¥ºê µ¥ÀÌÅÍ ÃÊ±âÈ­
+		Release_Floor_Cube_Object();
+		// ¹Ù´Ú cube object »ı¼º
+		Set_Floor_Cube_Object(); 
 
 		// ¸®½¼ ¼ÒÄÏ »ı¼º
 		SOCKET login_listen, keyinput_listen, cube_listen, playerdata_listen, chat_listen;
@@ -79,24 +70,19 @@ int main(int argc, char *argv[])
 		LoginPlayer(login_listen, keyinput_listen, cube_listen, playerdata_listen, chat_listen);
 
 		// Å¸ÀÌ¸Ó ÃÊ±âÈ­
-		SetTimer(timerHWND, TIMER_ID, 1000, TimerProc); // 1000ms(1ÃÊ)¸¶´Ù Å¸ÀÌ¸Ó È£Ãâ
 		std::cout << "Å¸ÀÌ¸Ó ½ÃÀÛ - " << remainingSeconds << std::endl;
-
+		HANDLE Timer_hThread = CreateThread(NULL, 0, Send_Game_Time,
+			(LPVOID)0, 0, NULL);
+		CloseHandle(Timer_hThread);
 
 		bool bGame = true;
 		while (bGame) {
-			// ½Ã°£ Ã³¸®¸¦ À§ÇÑ ¸Ş¼¼Áö ·çÇÁ
-			MSG msg;
-			while (GetMessage(&msg, NULL, 0, 0)) {
-				// ÇöÀç ÇÃ·¹ÀÌ¾î ÀÎ¿ø Ã¼Å© ¹× ¾øÀ» °æ¿ì Á¾·á
-				if (Current_Player_Count == 0)
-				{
-					printf("¸ğµç ÇÃ·¹ÀÌ¾î Á¾·á¸¦ È®ÀÎÇÔ\n");
-					bGame = false;
-					break;
-				}
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
+			// ÇöÀç ÇÃ·¹ÀÌ¾î ÀÎ¿ø Ã¼Å© ¹× ¾øÀ» °æ¿ì Á¾·á
+			if (Current_Player_Count == 0)
+			{
+				printf("¸ğµç ÇÃ·¹ÀÌ¾î Á¾·á¸¦ È®ÀÎÇÔ\n");
+				bGame = false;
+				break;
 			}
 		}
 
@@ -203,8 +189,6 @@ void InitGame()
 	{
 		bPlayerLogout[i] = false;
 	}
-
-	KillTimer(timerHWND, TIMER_ID);
 
 }
 
@@ -567,59 +551,63 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 	return 0;
 }
 
-
-// Å¸ÀÌ¸Ó Äİ¹é ÇÔ¼ö
-VOID CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
-	printf("½Ã°£ Å¸ÀÌ¸Ó ÇÔ¼ö ½ÇÇàÁß\n");
-	// ½Ã°£ ¾÷µ¥ÀÌÆ®
-	remainingSeconds--;
-	// ³²Àº ½Ã°£ÀÌ 0º¸´Ù Å©°Å³ª °°À¸¸é Å¬¶óÀÌ¾ğÆ®·Î ½Ã°£ ¾÷µ¥ÀÌÆ® ¹× Àü¼Û
-	if (remainingSeconds >= 0) {
-		Send_Game_Time();
-	}
-	else {
-		// °ÔÀÓ Á¾·á ÀÌº¥Æ® ¿©±â¿¡ Ãß°¡
-		std::array<int, MAXPLAYERCOUNT> player_cube_count;
-		for(const auto cube: Total_Cube)
+DWORD WINAPI Send_Game_Time(LPVOID arg) {
+	remainingSeconds = GAMETIME;
+	std::cout << "½Ã°£ ¾²·¹µå ½ÃÀÛ" << std::endl;
+	// ½Ã°£ µ¥ÀÌÅÍ º¸³»±â
+	while (true)
+	{
+		// ³²Àº ½Ã°£ÀÌ 0º¸´Ù Å©°Å³ª °°À¸¸é Å¬¶óÀÌ¾ğÆ®·Î ½Ã°£ ¾÷µ¥ÀÌÆ® ¹× Àü¼Û
+		if (remainingSeconds >= 0) 
 		{
-			if (cube.fColor_r - 1.0f < FLT_EPSILON) ++player_cube_count[0];
-			if (cube.fColor_g - 1.0f < FLT_EPSILON) ++player_cube_count[1];
-			if (cube.fColor_b - 1.0f < FLT_EPSILON) ++player_cube_count[2];
-		}
-		for(int i=0; i<socket_vector.size(); ++i)
-		{
-			if(socket_vector[i] !=INVALID_SOCKET)
+			for (int i = 0; i < socket_vector.size(); ++i)
 			{
-				int retval = send(socket_vector[i], (char*)&player_cube_count, sizeof(int) * MAXPLAYERCOUNT, 0);
-				if (retval == SOCKET_ERROR)
+				if (socket_vector[i])
 				{
-					if (PlayerLogout(i)) return;
-					if(Current_Player_Count==0) KillTimer(timerHWND, TIMER_ID);
-					break;
+					int retval = send(socket_vector[i], (char*)&remainingSeconds, sizeof(int), 0);
+					if (retval == SOCKET_ERROR) {
+						if (PlayerLogout(i)) return 0;
+						continue;
+					}
 				}
 			}
+			std::cout << "Sending time to the client: " << remainingSeconds << " seconds" << std::endl;
 		}
-		// Å¸ÀÌ¸Ó Á¾·á
-		KillTimer(timerHWND, TIMER_ID);
-		//for (int i = 0; i < MAXPLAYERCOUNT; ++i)	closesocket(socket_vector[i]);		// ½Ã°£ ¼ÒÄÏ close
-	}
-}
-
-
-void Send_Game_Time() {
-	// ½Ã°£ µ¥ÀÌÅÍ º¸³»±â
-	for(int i=0; i<socket_vector.size(); ++i)
-	{
-		if(socket_vector[i])
+		
+		// °ÔÀÓ Á¾·á ÀÌº¥Æ® 
+		else
 		{
-			int retval = send(socket_vector[i], (char*)&remainingSeconds, sizeof(int), 0);
-			if (retval == SOCKET_ERROR) {
-				if(PlayerLogout(i)) return;
-				continue;
+			std::array<int, MAXPLAYERCOUNT> player_cube_count {};
+			for (const auto cube : Total_Cube)
+			{
+				if (fabs(cube.fColor_r - 1.0f) < FLT_EPSILON) ++player_cube_count[0];
+				if (fabs(cube.fColor_g - 1.0f) < FLT_EPSILON) ++player_cube_count[1];
+				if (fabs(cube.fColor_b - 1.0f) < FLT_EPSILON) ++player_cube_count[2];
 			}
+			for (int i = 0; i < socket_vector.size(); ++i)
+			{
+				printf("[%d] ÇÃ·¹ÀÌ¾î Å¥ºê ¼³Ä¡ °³¼ö - %d\n", i, player_cube_count[i]);
+				if (socket_vector[i] != INVALID_SOCKET)
+				{
+					int retval = send(socket_vector[i], (char*)&player_cube_count, sizeof(int) * MAXPLAYERCOUNT, 0);
+					std::cout << "°á°ú Àü¼Û" << std::endl;
+					if (retval == SOCKET_ERROR)
+					{
+						if (PlayerLogout(i)) return 0;
+						if (Current_Player_Count == 0) return 0;
+						break;
+					}
+				}
+			}
+			break;
 		}
+		
+		Sleep(1000);	// 1ÃÊ¿¡ ÇÑ¹ø¾¿ º¸³»µµ·Ï ¾²·¹µå¸¦ sleep
+		--remainingSeconds;
 	}
-	std::cout << "Sending time to the client: " << remainingSeconds << " seconds" << std::endl;
+	std::cout << "½Ã°£ ¾²·¹µå Á¾·á" << std::endl;
+	for(int i =0 ; i < MAXPLAYERCOUNT; ++i)
+		if (PlayerLogout(i)) return 0;
 }
 
 bool Check_Add_Cube(Cube_Info cube)
@@ -817,4 +805,31 @@ void LoginPlayer(SOCKET& login_listen, SOCKET& keyinput_listen, SOCKET& cube_lis
 	closesocket(cube_listen);
 	closesocket(playerdata_listen);
 	closesocket(chat_listen);
+}
+
+
+void Set_Floor_Cube_Object()
+{
+	nObjects = (CUBE_INIT_RING_NUMBER * 2 + 1) * (CUBE_INIT_RING_NUMBER * 2 + 1);
+	ppObjects = new CObject * [CUBE_MAX_NUMBER] { NULL };
+
+	int c_i = 0;
+	CObject* pObject = NULL;
+
+	for (int x = -CUBE_INIT_RING_NUMBER; x <= CUBE_INIT_RING_NUMBER; ++x) {
+		for (int z = -CUBE_INIT_RING_NUMBER; z <= CUBE_INIT_RING_NUMBER; ++z) {
+			pObject = new CObject();
+			pObject->Set_Position(CUBE_WIDTH * x, 0.0f, CUBE_WIDTH * z);
+			ppObjects[c_i++] = pObject;
+		}
+	}
+}
+
+void Release_Floor_Cube_Object()
+{
+	if (nObjects)	nObjects = 0;
+	if (ppObjects != NULL)
+	{
+		ppObjects = NULL;
+	}
 }

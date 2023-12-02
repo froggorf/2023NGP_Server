@@ -2,8 +2,8 @@
 
 #define MAXPLAYERCOUNT 3		//TODO: 넷겜플 추진서에 추가하기
 #define TIMER_ID 1				// 윈도우 타이머 ID
-#define MAX_MIN 5				// 제한 시간
-#define GAMETIME 500
+//#define MAX_MIN 5				// 제한 시간
+#define GAMETIME 10
 
 
 #define CHATMAXBUFFER 40		// 채팅 최대 글자 수
