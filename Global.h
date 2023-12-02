@@ -9,7 +9,7 @@
 
 #define MAXPLAYERCOUNT 3		// 최대 플레이어 인원 수
 #define TIMER_ID 1				// 윈도우 타이머 ID
-#define GAMETIME 500			// 게임 시간(초단위)
+#define GAMETIME 5			// 게임 시간(초단위)
 
 #define CHATMAXBUFFER 40		// 채팅 최대 글자 수
 
