@@ -31,6 +31,8 @@ void ClearAllSocket();															// 게임 초기화 시 모든 소켓 정보 초기화
 bool PlayerLogout(int playerNumber);											// 플레이어가 게임 진행중 게임을 종료해 서버에서 나갔을 때 함수
 void Set_Floor_Cube_Object();													// 바닥 오브젝트 설정
 void Release_Floor_Cube_Object();												// 전체 오브젝트 초기화
+void Delete_Cube(Cube_Info clientCubeInput);									// 큐브 삭제 요청 send
+void Request_Delete_All_Cube();													// 큐브 전체 삭제 요청
 
 
 // ========================== 변수 ==========================
@@ -364,7 +366,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		else ElapsedTime = CurrentTime - g_prevTime;
 		g_prevTime = CurrentTime;
 		float ElapsedTimeInSec = (float)ElapsedTime / 1000.0f;
-		
+		if (ElapsedTimeInSec > 0.1f)	ElapsedTimeInSec = 0.1f;
 		//플레이어 이동로직 
 		// 플레이어 충돌체크 및 움직임 갱신
 		for (int i = 0; i < MAXPLAYERCOUNT; ++i)
@@ -497,54 +499,7 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 		// Cube Delete
 		else
 		{
-			auto it = std::find_if(Total_Cube.begin(), Total_Cube.end(), [&](const Cube_Info& value) {
-				return CompareXMFLOAT3(DirectX::XMFLOAT3(value.fPosition_x, value.fPosition_y, value.fPosition_z),
-				DirectX::XMFLOAT3(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z));
-				});
-
-			if (it != Total_Cube.end()) 
-			{
-				// 큐브 값은 찾은 경우
-				printf("큐브 삭제 가능\n");
-				Total_Cube.erase(it);
-
-				// delete to Cube Object
-				CObject* pSelected_Object = NULL;
-				int nSelected_Index = 0;
-				for (int i = 0; i < nObjects; ++i) {
-					if (CompareXMFLOAT3(ppObjects[i]->Get_Position(), DirectX::XMFLOAT3(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z)) )
-					{
-						pSelected_Object = ppObjects[i];
-						nSelected_Index = i;
-					}
-				}
-				if (pSelected_Object) 
-				{
-					ppObjects[nSelected_Index] = NULL;
-
-					if (nSelected_Index != nObjects - 1) {
-						ppObjects[nSelected_Index] = ppObjects[nObjects - 1];
-					}
-					--nObjects;
-				}
-
-				for (int i = 0; i < socket_Cube_vector.size(); ++i)
-				{
-					if (socket_Cube_vector[i] != INVALID_SOCKET)
-					{
-						int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
-						if (retval == SOCKET_ERROR) {
-							if (PlayerLogout(i)) return -1;
-							break;
-						}
-						std::cout << "Sending Delete cube_info to the client" << std::endl;
-					}
-				}
-			}
-			else {
-				// 큐브 값을 찾지 못한 경우
-				std::cout << "Delete Cube Value not found!" << std::endl;
-			}
+			Delete_Cube(clientCubeInput);
 		}
 	}
 	return 0;
@@ -556,6 +511,10 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 	// 시간 데이터 보내기
 	while (true)
 	{
+		if (Current_Player_Count == 0) {
+			std::cout << "시간 쓰레드 종료" << std::endl;
+			return 0;
+		}
 		// 남은 시간이 0보다 크거나 같으면 클라이언트로 시간 업데이트 및 전송
 		if (remainingSeconds >= 0) 
 		{
@@ -605,8 +564,9 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 		--remainingSeconds;
 	}
 	std::cout << "시간 쓰레드 종료" << std::endl;
-	for(int i =0 ; i < MAXPLAYERCOUNT; ++i)
-		if (PlayerLogout(i)) return 0;
+	for (int i = 0; i < MAXPLAYERCOUNT; ++i)
+		PlayerLogout(i);
+	return 0;
 }
 
 bool Check_Add_Cube(Cube_Info cube)
@@ -831,4 +791,62 @@ void Release_Floor_Cube_Object()
 	{
 		ppObjects = NULL;
 	}
+}
+
+void Delete_Cube(Cube_Info clientCubeInput)
+{
+	auto it = std::find_if(Total_Cube.begin(), Total_Cube.end(), [&](const Cube_Info& value) {
+		return CompareXMFLOAT3(DirectX::XMFLOAT3(value.fPosition_x, value.fPosition_y, value.fPosition_z),
+		DirectX::XMFLOAT3(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z));
+		});
+
+	if (it != Total_Cube.end())
+	{
+		// 큐브 값은 찾은 경우
+		printf("큐브 삭제 가능\n");
+		Total_Cube.erase(it);
+
+		// delete to Cube Object
+		CObject* pSelected_Object = NULL;
+		int nSelected_Index = 0;
+		for (int i = 0; i < nObjects; ++i) {
+			if (CompareXMFLOAT3(ppObjects[i]->Get_Position(), DirectX::XMFLOAT3(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z)))
+			{
+				pSelected_Object = ppObjects[i];
+				nSelected_Index = i;
+			}
+		}
+		if (pSelected_Object)
+		{
+			ppObjects[nSelected_Index] = NULL;
+
+			if (nSelected_Index != nObjects - 1) {
+				ppObjects[nSelected_Index] = ppObjects[nObjects - 1];
+			}
+			--nObjects;
+		}
+
+		for (int i = 0; i < socket_Cube_vector.size(); ++i)
+		{
+			if (socket_Cube_vector[i] != INVALID_SOCKET)
+			{
+				int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+				if (retval == SOCKET_ERROR) {
+					break;
+				}
+				std::cout << "Sending Delete cube_info to the client" << std::endl;
+			}
+		}
+	}
+	else {
+		// 큐브 값을 찾지 못한 경우
+		std::cout << "Delete Cube Value not found!" << std::endl;
+	}
+}
+
+void Request_Delete_All_Cube() 
+{
+	for (auto p : Total_Cube)
+		Delete_Cube(p);
+	Release_Floor_Cube_Object();
 }
