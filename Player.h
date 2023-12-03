@@ -4,7 +4,7 @@
 #include "Global.h"
 
 
-#define PLAYER_MAX_VELOCITY 75.0f
+#define PLAYER_MAX_VELOCITY 50.0f
 #define PLAYER_MAX_GRAVITY 75.0f
 #define PLAYER_GRAVITY 100.0f
 #define PLAYER_FRICTION 500.0f
@@ -45,7 +45,6 @@ protected:
 
 	//
 	bool m_bAble_2_Jump = false;
-	bool check_able_Jump = false;
 
 public:
 	CPlayer();
