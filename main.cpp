@@ -64,10 +64,6 @@ int main(int argc, char *argv[])
 		// 게임 데이터 초기화
 		InitGame();
 
-		//플레이어 데이터 전송 쓰레드 미리 실행시키기
-		HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
-			(LPVOID)0, 0, NULL);
-		CloseHandle(hThread);
 
 		// 플레이어 지정한 수 인원 접속시키기
 		LoginPlayer(login_listen, keyinput_listen, cube_listen, playerdata_listen, chat_listen);
@@ -152,7 +148,15 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 		// 클라이언트 주소 변수에 추가 
 		clientAddr[Current_Player_Count] = clientaddr;
 	}
-	
+
+	// 로그인 중 한명의 플레이어도 존재하지 않을 경우 쓰레드가 종료되는데
+	// 그에 따른 추가 생성 
+	if (Current_Player_Count == 0) {
+		//플레이어 데이터 전송 쓰레드 미리 실행시키기
+		HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
+			(LPVOID)0, 0, NULL);
+		CloseHandle(hThread);
+	}
 
 	// 플레이어 수 증가
 	Current_Player_Count += 1;
@@ -233,6 +237,8 @@ void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
 		return;
 	}
 
+	printf("123123\n");
+
 	HANDLE hThread = CreateThread(NULL, 0, ProcessClientKeyInput,
 		(LPVOID)client_sock, 0, NULL);
 	if (hThread == NULL) {  closesocket(client_sock); }
@@ -240,7 +246,6 @@ void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
 }
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 {
-	printf("키 인풋 쓰레드 시작\n");
 	SOCKET ClientKeyInputSocket = (SOCKET)arg;
 	struct sockaddr_in clientaddr;
 
