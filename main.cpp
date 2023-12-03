@@ -123,7 +123,6 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 		for(int i=0; i<socket_vector.size(); ++i)
 		{
 			if (socket_vector[i] == INVALID_SOCKET) {
-				printf("의도대로 추가 잘됨-1\n");
 				// PlayerNumber 전달
 				send(client_sock, (char*)&i, sizeof(Current_Player_Count), 0);
 				socket_vector[i] = client_sock;
@@ -260,20 +259,16 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 		{
 			break;
 		}
-		printf("%d 플레이어가 %d 버튼 ", clientKeyInput.PlayerNumber, clientKeyInput.Key);
 		if(clientKeyInput.KeyDown)
 		{
 			SetKeyBuffer(clientKeyInput.PlayerNumber, clientKeyInput.Key, true);
-			printf("누름\n");
 
 		}else
 		{
 			SetKeyBuffer(clientKeyInput.PlayerNumber, clientKeyInput.Key, false);
-			printf("뗌\n");
 		}
 	}
 	closesocket(ClientKeyInputSocket);
-	printf("클라이언트 키 인풋은 잘 지워짐\n");
 	return 0;
 }
 
@@ -294,7 +289,6 @@ void CreateChatThread(SOCKET& chat_listen_sock)
 		for (int i = 0; i < socket_chat_vector.size(); ++i)
 		{
 			if (socket_chat_vector[i] == INVALID_SOCKET) {
-				printf("의도대로 추가 잘됨-4\n");
 				socket_chat_vector[i] = client_sock;
 				break;
 			}
@@ -354,7 +348,6 @@ DWORD WINAPI ProcessEchoChat(LPVOID arg)
 				
 		}
 	}
-	printf("채팅 쓰레드는 잘 지워짐");
 	return 0;
 }
 void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
@@ -374,7 +367,6 @@ void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
 		for (int i = 0; i < socket_SendPlayerData_vector.size(); ++i)
 		{
 			if (socket_SendPlayerData_vector[i] == INVALID_SOCKET) {
-				printf("의도대로 추가 잘됨-3\n");
 				socket_SendPlayerData_vector[i] = client_sock;
 				break;
 			}
@@ -481,7 +473,6 @@ void CreateCubeThread(SOCKET& Cube_listen_sock)
 		for (int i = 0; i < socket_Cube_vector.size(); ++i)
 		{
 			if (socket_Cube_vector[i] == INVALID_SOCKET) {
-				printf("의도대로 추가 잘됨-2\n");
 				socket_Cube_vector[i] = client_sock;
 				break;
 			}
