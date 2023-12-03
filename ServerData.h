@@ -9,23 +9,27 @@
 
 
 // ========================== 구조체 및 클래스 ==========================
+// 플레이어 정보 송수신 구조체
 extern struct Player_Info{
 	float fPosition_x, fPosition_y, fPosition_z;
 	float fLook_x, fLook_z;
 };
 
+// 큐브 송수신 정보 구조체
 struct Cube_Info {
 	float fPosition_x, fPosition_y, fPosition_z;
 	float fColor_r, fColor_g, fColor_b;
 	bool AddorDelete;
 };
 
+// 룩벡터 송수신 정보 구조체
 struct Look_Data
 {
 	int PlayerNumber;
 	float fLook_x, fLook_z;
 };
 
+// 채팅 송수신 정보 클래스
 class ChatString
 {
 public:

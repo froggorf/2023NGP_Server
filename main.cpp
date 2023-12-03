@@ -64,10 +64,6 @@ int main(int argc, char *argv[])
 		// 게임 데이터 초기화
 		InitGame();
 
-		//플레이어 데이터 전송 쓰레드 미리 실행시키기
-		HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
-			(LPVOID)0, 0, NULL);
-		CloseHandle(hThread);
 
 		// 플레이어 지정한 수 인원 접속시키기
 		LoginPlayer(login_listen, keyinput_listen, cube_listen, playerdata_listen, chat_listen);
@@ -123,7 +119,6 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 		for(int i=0; i<socket_vector.size(); ++i)
 		{
 			if (socket_vector[i] == INVALID_SOCKET) {
-				printf("의도대로 추가 잘됨-1\n");
 				// PlayerNumber 전달
 				send(client_sock, (char*)&i, sizeof(Current_Player_Count), 0);
 				socket_vector[i] = client_sock;
@@ -153,7 +148,15 @@ void ConnectAndAddPlayer(SOCKET& listen_sock)
 		// 클라이언트 주소 변수에 추가 
 		clientAddr[Current_Player_Count] = clientaddr;
 	}
-	
+
+	// 로그인 중 한명의 플레이어도 존재하지 않을 경우 쓰레드가 종료되는데
+	// 그에 따른 추가 생성 
+	if (Current_Player_Count == 0) {
+		//플레이어 데이터 전송 쓰레드 미리 실행시키기
+		HANDLE hThread = CreateThread(NULL, 0, SendPlayerDataToClient,
+			(LPVOID)0, 0, NULL);
+		CloseHandle(hThread);
+	}
 
 	// 플레이어 수 증가
 	Current_Player_Count += 1;
@@ -234,6 +237,8 @@ void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
 		return;
 	}
 
+	printf("123123\n");
+
 	HANDLE hThread = CreateThread(NULL, 0, ProcessClientKeyInput,
 		(LPVOID)client_sock, 0, NULL);
 	if (hThread == NULL) {  closesocket(client_sock); }
@@ -241,7 +246,6 @@ void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
 }
 DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 {
-	printf("키 인풋 쓰레드 시작\n");
 	SOCKET ClientKeyInputSocket = (SOCKET)arg;
 	struct sockaddr_in clientaddr;
 
@@ -260,20 +264,16 @@ DWORD WINAPI ProcessClientKeyInput(LPVOID arg)
 		{
 			break;
 		}
-		printf("%d 플레이어가 %d 버튼 ", clientKeyInput.PlayerNumber, clientKeyInput.Key);
 		if(clientKeyInput.KeyDown)
 		{
 			SetKeyBuffer(clientKeyInput.PlayerNumber, clientKeyInput.Key, true);
-			printf("누름\n");
 
 		}else
 		{
 			SetKeyBuffer(clientKeyInput.PlayerNumber, clientKeyInput.Key, false);
-			printf("뗌\n");
 		}
 	}
 	closesocket(ClientKeyInputSocket);
-	printf("클라이언트 키 인풋은 잘 지워짐\n");
 	return 0;
 }
 
@@ -294,7 +294,6 @@ void CreateChatThread(SOCKET& chat_listen_sock)
 		for (int i = 0; i < socket_chat_vector.size(); ++i)
 		{
 			if (socket_chat_vector[i] == INVALID_SOCKET) {
-				printf("의도대로 추가 잘됨-4\n");
 				socket_chat_vector[i] = client_sock;
 				break;
 			}
@@ -354,7 +353,6 @@ DWORD WINAPI ProcessEchoChat(LPVOID arg)
 				
 		}
 	}
-	printf("채팅 쓰레드는 잘 지워짐");
 	return 0;
 }
 void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
@@ -374,7 +372,6 @@ void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock)
 		for (int i = 0; i < socket_SendPlayerData_vector.size(); ++i)
 		{
 			if (socket_SendPlayerData_vector[i] == INVALID_SOCKET) {
-				printf("의도대로 추가 잘됨-3\n");
 				socket_SendPlayerData_vector[i] = client_sock;
 				break;
 			}
@@ -481,7 +478,6 @@ void CreateCubeThread(SOCKET& Cube_listen_sock)
 		for (int i = 0; i < socket_Cube_vector.size(); ++i)
 		{
 			if (socket_Cube_vector[i] == INVALID_SOCKET) {
-				printf("의도대로 추가 잘됨-2\n");
 				socket_Cube_vector[i] = client_sock;
 				break;
 			}
