@@ -173,9 +173,6 @@ void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects, int PlayerN
 			else {
 				m_xmf4x4_World._42 = m_xmf3_Position.y = xmf3_Object_Position.y - CUBE_WIDTH / 2 - PLAYER_HEIGHT / 2 - PLAYER_COLLISION_OFFSET;
 			}
-
-			//
-			OutputDebugStringA("Crashed!!\n");
 		}
 	}
 
@@ -183,21 +180,19 @@ void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects, int PlayerN
 	if (m_xmf3_Position.x < CUBE_WIDTH * 10 && m_xmf3_Position.x > -(CUBE_WIDTH * 10)) {
 		// axis x
 		Move(m_xmf3_Calculated_Vel.x, 0.0f, 0.0f);
-		Prepare_Render();
 	}
 	else
 	{
 		if (m_xmf3_Position.x > CUBE_WIDTH * 10) {
 			// axis x
 			Move(-0.05f, 0.0f, 0.0f);
-			Prepare_Render();
 		}
 		else {
 			// axis x
 			Move(0.05f, 0.0f, 0.0f);
-			Prepare_Render();
 		}
 	}
+	Prepare_Render();
 
 	//
 	for (int& num : vCrashed_Objs) {
@@ -223,21 +218,19 @@ void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects, int PlayerN
 	if (m_xmf3_Position.z < CUBE_WIDTH * 10 && m_xmf3_Position.z > -(CUBE_WIDTH * 10)) {
 		// axis z
 		Move(0.0f, 0.0f, m_xmf3_Calculated_Vel.z);
-		Prepare_Render();
 	}
 	else
 	{
 		if (m_xmf3_Position.z > CUBE_WIDTH * 10) {
 			// axis x
 			Move(0.0f, 0.0f, -0.05f);
-			Prepare_Render();
 		}
 		else {
 			// axis x
 			Move(0.0f, 0.0f, 0.05f);
-			Prepare_Render();
 		}
 	}
+	Prepare_Render();
 	//
 	for (int& num : vCrashed_Objs) {
 		d3d_OBB_Player = Get_OBB(0);

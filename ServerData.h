@@ -53,7 +53,6 @@ public:
 // ========================== º¯¼ö ==========================
 CPlayer* vPlayer = new CPlayer[MAXPLAYERCOUNT];
 
-//CCube_Player* pCube_Player = new CCube_Player();
 CObject** ppObjects;
 int nObjects;
 
