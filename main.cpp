@@ -23,10 +23,10 @@ void CreateSendPlayerDataThread(SOCKET& senddata_listen_sock);					// 플레이어 �
 DWORD WINAPI SendPlayerDataToClient(LPVOID arg);								// 메인 작업 쓰레드, 플레이어 이동 - 충돌체크 - 모든 클라에게 모든 플레이어 위치 전송
 void CreateChatThread(SOCKET& chat_listen_sock);								// 채팅 소켓 및 쓰레드 생성
 DWORD WINAPI ProcessEchoChat(LPVOID arg);										// 채팅 정보 수신 받아 모든 클라에게 전송하는 함수
-void CreateCubeThread(SOCKET& Cube_listen_sock);
-DWORD WINAPI EchoClientRequestCube(LPVOID arg);
-bool Check_Add_Cube(Cube_Info cube);
-bool CompareXMFLOAT3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b);
+void CreateCubeThread(SOCKET& Cube_listen_sock);								// 각 플레이어 접속시 큐브 쓰레드 생성
+DWORD WINAPI EchoClientRequestCube(LPVOID arg);									// 받은 큐브 정보 설치 및 삭제 판별 후 모든 클라이언트에게 다시 돌려보냄
+bool Check_Add_Cube(Cube_Info cube);											// 플레이어 주변 바운딩 박스로 충돌체크하여 큐브 설치 가능한지 확인하는 함수
+bool CompareXMFLOAT3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b);	// XMFLOAT3 비교 함수
 void ClearAllSocket();															// 게임 초기화 시 모든 소켓 정보 초기화
 bool PlayerLogout(int playerNumber);											// 플레이어가 게임 진행중 게임을 종료해 서버에서 나갔을 때 함수
 void Set_Floor_Cube_Object();													// 바닥 오브젝트 설정
@@ -43,6 +43,7 @@ HWND timerHWND;																	// 타이머 핸들
 DWORD g_startTime;																// ElapsedTime 관련
 DWORD g_prevTime;
 CRITICAL_SECTION cs_for_logout;													// PlayerLogout(int) 내부 bool bPlayerLogout[] 사용을 위한 cs
+CRITICAL_SECTION cs_Cube;														// cs_Cube 사용을 위한 cs
 bool bPlayerLogout[MAXPLAYERCOUNT] = { false, };								// 로그아웃 중복 처리 방지 변수
 
 int main(int argc, char *argv[])
@@ -208,6 +209,9 @@ void InitGame()
 	// cs_for_logout 
 	DeleteCriticalSection(&cs_for_logout);
 	InitializeCriticalSection(&cs_for_logout);
+	// cs_for_Cube
+	DeleteCriticalSection(&cs_Cube);
+	InitializeCriticalSection(&cs_Cube);
 
 	// 로그아웃 변수 초기화
 	for(int i=0; i<MAXPLAYERCOUNT; ++i)
@@ -391,7 +395,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 
 	int retval;
 	struct Look_Data data;
-	while (1)
+	while (1) 
 	{
 		Sleep(16);
 		int size = socket_SendPlayerData_vector.size();
@@ -418,6 +422,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		g_prevTime = CurrentTime;
 		float ElapsedTimeInSec = (float)ElapsedTime / 1000.0f;
 		if (ElapsedTimeInSec > 0.1f)	ElapsedTimeInSec = 0.1f;
+
 		//플레이어 이동로직 
 		// 플레이어 충돌체크 및 움직임 갱신
 		if(remainingSeconds <= GAMETIME)
@@ -436,7 +441,6 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 				Player_Info[i].fPosition_z = vPlayer[i].Get_Position().z;
 			}
 		}
-		
 		
 
 		//플레이어 정보 모두 전송
@@ -489,11 +493,14 @@ void CreateCubeThread(SOCKET& Cube_listen_sock)
 	}
 
 	// 현재 맵에 놓여있는 모든 큐브 정보 전송
+	EnterCriticalSection(&cs_Cube);
 	for(const auto cube : Total_Cube)
 	{
 		send(client_sock, (char*)&cube, sizeof(cube), 0);
 	}
+	LeaveCriticalSection(&cs_Cube);
 
+	// 각 플레이어 마다 큐브 스레드 생성
 	HANDLE hThread = CreateThread(NULL, 0, EchoClientRequestCube,
 		(LPVOID)client_sock, 0, NULL);
 	if (hThread == NULL) { closesocket(client_sock); }
@@ -527,9 +534,11 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 			}
 		}
 		
-		printf("Cube Position - %.2f, %.2f, %.2f\n", clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
-		printf("Cube Color - %.2f, %.2f, %.2f\n", clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b);
-		printf("Cube Add or Delete - %s\n", clientCubeInput.AddorDelete ? "Add" : "Delete");
+		// 받은 큐브 정보 출력
+		printf("[Cube] -[%.2f, %.2f, %.2f] 위치에 [%.2f, %.2f, %.2f] 색 %s\n", 
+			clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z,
+			clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b,
+			clientCubeInput.AddorDelete ? "Add" : "Delete");
 		
 		// Cube Add
 		if (clientCubeInput.AddorDelete)	
@@ -537,14 +546,16 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 			// 여기서 큐브와 사람 충돌체크
 			if (Check_Add_Cube(clientCubeInput))
 			{
-				printf("큐브 설치 불가능\n");
+				//printf("해당 위치에 큐브 설치 불가능\n");
 			}
 			// 가능시에만 각 클라에게 큐브 정보 send
 			else
 			{
-				printf("큐브 설치 가능\n");
 				// add to Total_Cube
+				EnterCriticalSection(&cs_Cube);
 				Total_Cube.push_back(clientCubeInput);
+				LeaveCriticalSection(&cs_Cube);
+
 				// add to Cube Object
 				CObject* pObject = new CObject();
 				pObject->Set_Position(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
@@ -560,7 +571,6 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 							if (PlayerLogout(i)) return -1;
 							break;
 						}
-						std::cout << "Sending Add cube_info to the client" << std::endl;
 					}
 				}
 				
@@ -599,26 +609,27 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 					}
 				}
 			}
-			std::cout << "Sending time to the client: " << remainingSeconds << " seconds" << std::endl;
+			std::cout << "남은 게임 시간: " << remainingSeconds << " seconds" << std::endl;
 		}
 		
 		// 게임 종료 이벤트 
 		else
 		{
 			std::array<int, MAXPLAYERCOUNT> player_cube_count {};
+			EnterCriticalSection(&cs_Cube);
 			for (const auto cube : Total_Cube)
 			{
 				if (fabs(cube.fColor_r - 1.0f) < FLT_EPSILON) ++player_cube_count[0];
 				if (fabs(cube.fColor_g - 1.0f) < FLT_EPSILON) ++player_cube_count[1];
 				if (fabs(cube.fColor_b - 1.0f) < FLT_EPSILON) ++player_cube_count[2];
 			}
+			LeaveCriticalSection(&cs_Cube);
 			for (int i = 0; i < socket_vector.size(); ++i)
 			{
 				printf("[%d] 플레이어 큐브 설치 개수 - %d\n", i, player_cube_count[i]);
 				if (socket_vector[i] != INVALID_SOCKET)
 				{
 					int retval = send(socket_vector[i], (char*)&player_cube_count, sizeof(int) * MAXPLAYERCOUNT, 0);
-					std::cout << "결과 전송" << std::endl;
 					if (retval == SOCKET_ERROR)
 					{
 						if (PlayerLogout(i)) return 0;
@@ -639,6 +650,7 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 	return 0;
 }
 
+// 모든 플레이어랑 설치하려는 큐브와 미리 충돌체크하여 return
 bool Check_Add_Cube(Cube_Info cube)
 {
 	CObject* CheckCollsion_Cube = NULL;
@@ -834,7 +846,11 @@ void LoginPlayer(SOCKET& login_listen, SOCKET& keyinput_listen, SOCKET& cube_lis
 		CreateChatThread(chat_listen);
 	}
 
+	// 게임 시작시 기존 큐브 모두 삭제 및 기본 바닥 큐브 재설치
 	Request_Delete_All_Cube();
+	Release_Floor_Cube_Object();
+	Set_Floor_Cube_Object();
+
 	Player_Info[0].fPosition_x = 75.0f; Player_Info[0].fPosition_y = 50.0f; Player_Info[0].fPosition_z = 0.0f;
 	Player_Info[1].fPosition_x = 0.0f; Player_Info[1].fPosition_y = 50.0f; Player_Info[1].fPosition_z = 0.0f;
 	Player_Info[2].fPosition_x = 0.0f; Player_Info[2].fPosition_y = 50.0f; Player_Info[2].fPosition_z = -75.0f;
@@ -850,7 +866,7 @@ void LoginPlayer(SOCKET& login_listen, SOCKET& keyinput_listen, SOCKET& cube_lis
 	closesocket(chat_listen);
 }
 
-
+// 바닥 큐브 set
 void Set_Floor_Cube_Object()
 {
 	nObjects = (CUBE_INIT_RING_NUMBER * 2 + 1) * (CUBE_INIT_RING_NUMBER * 2 + 1);
@@ -868,6 +884,7 @@ void Set_Floor_Cube_Object()
 	}
 }
 
+// 바닥 및 모든 큐브 관련 변수 초기화
 void Release_Floor_Cube_Object()
 {
 	// 큐브 데이터 초기화
@@ -880,8 +897,10 @@ void Release_Floor_Cube_Object()
 	}
 }
 
+// 큐브를 삭제하기 위한 함수
 void Delete_Cube(Cube_Info clientCubeInput)
 {
+	EnterCriticalSection(&cs_Cube);
 	auto it = std::find_if(Total_Cube.begin(), Total_Cube.end(), [&](const Cube_Info& value) {
 		return CompareXMFLOAT3(DirectX::XMFLOAT3(value.fPosition_x, value.fPosition_y, value.fPosition_z),
 		DirectX::XMFLOAT3(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z));
@@ -890,7 +909,7 @@ void Delete_Cube(Cube_Info clientCubeInput)
 	if (it != Total_Cube.end())
 	{
 		// 큐브 값은 찾은 경우
-		printf("큐브 삭제 가능\n");
+		//printf("큐브 삭제 가능\n");
 		Total_Cube.erase(it);
 
 		// delete to Cube Object
@@ -921,7 +940,6 @@ void Delete_Cube(Cube_Info clientCubeInput)
 				if (retval == SOCKET_ERROR) {
 					break;
 				}
-				std::cout << "Sending Delete cube_info to the client" << std::endl;
 			}
 		}
 	}
@@ -929,11 +947,14 @@ void Delete_Cube(Cube_Info clientCubeInput)
 		// 큐브 값을 찾지 못한 경우
 		std::cout << "Delete Cube Value not found!" << std::endl;
 	}
+	LeaveCriticalSection(&cs_Cube);
 }
 
+// 모든 큐브 삭제하는 코드
 void Request_Delete_All_Cube() 
 {
-	// 현재 맵에 놓여있는 모든 큐브 정보 전송
+	// 현재 맵에 놓여있는 모든 큐브 정보 삭제로 바꿔서 전송
+	EnterCriticalSection(&cs_Cube);
 	for (auto socket : socket_Cube_vector) {
 		for (auto cube : Total_Cube)
 		{
@@ -941,4 +962,5 @@ void Request_Delete_All_Cube()
 			send(socket, (char*)&cube, sizeof(cube), 0);
 		}
 	}
+	LeaveCriticalSection(&cs_Cube);
 }
