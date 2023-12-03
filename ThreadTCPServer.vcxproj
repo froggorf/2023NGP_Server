@@ -151,7 +151,6 @@
   <ItemGroup>
     <ClInclude Include="ClientKeyInput.h" />
     <ClInclude Include="Global.h" />
-    <ClInclude Include="Mesh.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="ProcessClientInput.h">

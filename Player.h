@@ -78,7 +78,6 @@ public:
 	void Move(DirectX::XMFLOAT3& xmf3_Shift, bool bVelocity = false);
 	void Move(float fOffset_x = 0.0f, float fOffset_y = 0.0f, float fOffset_z = 0.0f);
 
-	void Rotate(float x, float y, float z);
 
 	void Update(int PlayerNumber, float fElapsed_Time);
 
@@ -86,20 +85,7 @@ public:
 	void Set_Player_Udt_Context(LPVOID pContext) { m_pPlayer_Udt_Context = pContext; }
 
 	//
-	//virtual void Prcs_Collision(CObject* pObject);
-	virtual void Udt_N_Prcs_Collision(CObject** ppObject, int nObjects, int PlayerNumber);
-	void Prepare_Render();
-	bool Check_Collision_Add_Cube(CObject* pObject, int PlayerNumber);
-};
-
-
-//
-class CCube_Player : public CPlayer {
-public:
-	CCube_Player()
-	{
-		CMesh* pCube_Mesh = new CCube_Mesh(PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_WIDTH);
-		Set_Position(DirectX::XMFLOAT3(0.0f, 50.0f, 0.0f));
-	}
-	~CCube_Player() {}
+	virtual void Udt_N_Prcs_Collision(CObject** ppObject, int nObjects, int PlayerNumber);	// 충돌체크
+	void Prepare_Render();																	// 행렬 갱신
+	bool Check_Collision_Add_Cube(CObject* pObject, int PlayerNumber);						// add cube 가능한지 바운딩 박스로 확인
 };
