@@ -39,8 +39,6 @@ CPlayer::~CPlayer() {
 }
 
 void CPlayer::Move(int PlayerNumber, float fDistance, bool bVelocity) {
-	m_bAble_2_Jump = false;
-
 	DirectX::XMFLOAT3 xmf3_Shift = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
 
 	if (GetKeyBuffer(PlayerNumber, CUSTOM_VK_W)) {
@@ -56,9 +54,9 @@ void CPlayer::Move(int PlayerNumber, float fDistance, bool bVelocity) {
 		xmf3_Shift = Vector3::Add(xmf3_Shift, m_xmf3_Right, -fDistance);
 	}
 
-	if (check_able_Jump) {
+	if (m_bAble_2_Jump) {
 		if (GetKeyBuffer(PlayerNumber, CUSTOM_VK_SPACE)) {
-			m_bAble_2_Jump = true;
+			m_bAble_2_Jump = false;
 			SetKeyBuffer(PlayerNumber, CUSTOM_VK_SPACE, false);
 			m_xmf3_Velocity.y = 0.0f;
 			xmf3_Shift = Vector3::Add(xmf3_Shift, m_xmf3_Up, fDistance * CUBE_WIDTH * 1.5f);
@@ -120,13 +118,11 @@ void CPlayer::Update(int PlayerNumber, float fElapsed_Time) {
 	//
 	DirectX::XMFLOAT3 xmf3_Friction = Vector3::Add(m_xmf3_Velocity, Vector3::Multiply(m_xmf3_Velocity, -fDeceleration, true));
 
-	m_xmf3_Velocity.x = xmf3_Friction.x;
-	m_xmf3_Velocity.z = xmf3_Friction.z;
-
 	// 바닥에 닿아 있을시만 점프 가능하게
-	if (m_xmf3_Velocity.y)
-	{
-		check_able_Jump = false;
+
+	if (m_bAble_2_Jump) {
+		m_xmf3_Velocity.x = xmf3_Friction.x;
+		m_xmf3_Velocity.z = xmf3_Friction.z;
 	}
 
 	Prepare_Render();
@@ -168,7 +164,7 @@ void CPlayer::Udt_N_Prcs_Collision(CObject** ppObject, int nObjects, int PlayerN
 			if (m_xmf3_Calculated_Vel.y < 0) {
 				m_xmf4x4_World._42 = m_xmf3_Position.y = xmf3_Object_Position.y + CUBE_WIDTH / 2 + PLAYER_HEIGHT / 2 + PLAYER_COLLISION_OFFSET;
 
-				check_able_Jump = true;
+				m_bAble_2_Jump = true;
 			}
 			else {
 				m_xmf4x4_World._42 = m_xmf3_Position.y = xmf3_Object_Position.y - CUBE_WIDTH / 2 - PLAYER_HEIGHT / 2 - PLAYER_COLLISION_OFFSET;
