@@ -83,13 +83,11 @@ int main(int argc, char *argv[])
 			// 현재 플레이어 인원 체크 및 없을 경우 종료
 			if (Current_Player_Count == 0)
 			{
-				printf("모든 플레이어 종료를 확인함\n");
 				bGame = false;
 				break;
 			}
 		}
-
-		printf("서버 종료를 확인함 다시 while 돌리면 됨\n");
+		
 
 		// TODO: 현재는 InitGame()으로 종료 초기화 진행, 필요시 EndGame() 만들기.
 		InitGame();
@@ -240,8 +238,7 @@ void CreateClientKeyInputThread(SOCKET& KeyInput_listen_sock)
 		err_display("CreateClientKeyInputThread() - accept()");
 		return;
 	}
-
-	printf("123123\n");
+	
 
 	HANDLE hThread = CreateThread(NULL, 0, ProcessClientKeyInput,
 		(LPVOID)client_sock, 0, NULL);
@@ -332,7 +329,8 @@ DWORD WINAPI ProcessEchoChat(LPVOID arg)
 				for (int i = 0; i < MAXPLAYERCOUNT; ++i)
 				{
 					if (socket_chat_vector[i] == echo_chat_socket) {
-						if (PlayerLogout(i)) return 0;
+						return 0;
+						//if (PlayerLogout(i)) return 0;
 						
 						break;
 					}
@@ -350,7 +348,8 @@ DWORD WINAPI ProcessEchoChat(LPVOID arg)
 				retval = send(socket_chat_vector[i], (char*)&chat_string, sizeof(ChatString), 0);
 				if(retval == SOCKET_ERROR)
 				{
-					if(PlayerLogout(i)) return -1;
+					return -1;
+					//if(PlayerLogout(i)) return -1;
 				}
 				
 			}
@@ -428,6 +427,7 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 		// 플레이어 충돌체크 및 움직임 갱신
 		if(remainingSeconds <= GAMETIME)
 		{
+			
 			for (int i = 0; i < MAXPLAYERCOUNT; ++i)
 			{
 				vPlayer[i].Set_Look_Vector(DirectX::XMFLOAT3(Player_Info[i].fLook_x, 0, Player_Info[i].fLook_z));
@@ -526,6 +526,7 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 				{
 					if (socket_Cube_vector[i] == CubeSocket)
 					{
+						return -1;
 						if (PlayerLogout(i)) return -1;
 						break;
 					}
@@ -537,20 +538,13 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 		if (remainingSeconds <= GAMETIME)
 		{
 
-
-			// 받은 큐브 정보 출력
-			printf("[Cube] -[%.2f, %.2f, %.2f] 위치에 [%.2f, %.2f, %.2f] 색 %s\n",
-				clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z,
-				clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b,
-				clientCubeInput.AddorDelete ? "Add" : "Delete");
-
+			
 			// Cube Add
 			if (clientCubeInput.AddorDelete)
 			{
 				// 여기서 큐브와 사람 충돌체크
 				if (Check_Add_Cube(clientCubeInput))
 				{
-					//printf("해당 위치에 큐브 설치 불가능\n");
 				}
 				// 가능시에만 각 클라에게 큐브 정보 send
 				else
@@ -572,7 +566,8 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 						{
 							int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
 							if (retval == SOCKET_ERROR) {
-								if (PlayerLogout(i)) return -1;
+								return -1;
+								//if (PlayerLogout(i)) return -1;
 								break;
 							}
 						}
@@ -652,7 +647,6 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 			}
 			for (int i = 0; i < socket_vector.size(); ++i)
 			{
-				printf("[%d] 플레이어 큐브 설치 개수 - %d\n", i, player_cube_count[i]);
 				if (socket_vector[i] != INVALID_SOCKET)
 				{
 					int retval = send(socket_vector[i], (char*)&number_max, sizeof(int), 0);
@@ -726,7 +720,6 @@ bool PlayerLogout(int playerNumber)
 	if (socket_vector[playerNumber] != INVALID_SOCKET && !bPlayerLogout[playerNumber]) {
 		mtx.lock();
 		bPlayerLogout[playerNumber] = true;
-		printf(" %d 번째 플레이어가 로그아웃 하였습니다.\n ", playerNumber);
 		closesocket(socket_vector[playerNumber]);
 		//if (socket_Cube_vector[playerNumber] != INVALID_SOCKET)	
 		closesocket(socket_Cube_vector[playerNumber]);
@@ -743,7 +736,6 @@ bool PlayerLogout(int playerNumber)
 
 		// 현재 플레이어 수 줄이기
 		Current_Player_Count -= 1;
-		printf("%d 명의 플레이어만 남음\n",Current_Player_Count);
 
 		Player_Info[playerNumber].fPosition_x = 0.0f; Player_Info[playerNumber].fPosition_y = -50.0f; Player_Info[playerNumber].fPosition_z = 0.0f;
 		vPlayer[playerNumber].Set_Position(DirectX::XMFLOAT3(0.0f, -50.0f, 0.0f));
@@ -934,7 +926,6 @@ void Delete_Cube(Cube_Info clientCubeInput)
 	if (it != Total_Cube.end())
 	{
 		// 큐브 값은 찾은 경우
-		//printf("큐브 삭제 가능\n");
 		Total_Cube.erase(it);
 
 		// delete to Cube Object
