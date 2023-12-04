@@ -873,7 +873,6 @@ void LoginPlayer(SOCKET& login_listen, SOCKET& keyinput_listen, SOCKET& cube_lis
 	}
 
 	// 게임 시작시 기존 큐브 모두 삭제 및 기본 바닥 큐브 재설치
-	Request_Delete_All_Cube();
 	Release_Floor_Cube_Object();
 	Set_Floor_Cube_Object();
 
@@ -976,19 +975,3 @@ void Delete_Cube(Cube_Info clientCubeInput)
 	LeaveCriticalSection(&cs_Cube);
 }
 
-// 모든 큐브 삭제하는 코드
-void Request_Delete_All_Cube() 
-{
-	// 현재 맵에 놓여있는 모든 큐브 정보 삭제로 바꿔서 전송
-	/*EnterCriticalSection(&cs_Cube);
-	for (auto socket : socket_Cube_vector) {
-		for (auto cube : Total_Cube)
-		{
-			cube.AddorDelete = false;
-			send(socket, (char*)&cube, sizeof(cube), 0);
-		}
-	}
-	LeaveCriticalSection(&cs_Cube);*/
-
-	// 큐브 데이터 초기화
-}
