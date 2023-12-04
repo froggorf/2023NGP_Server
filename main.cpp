@@ -9,6 +9,8 @@
 #include <Mmsystem.h>
 #pragma comment(lib, "winmm.lib")
 
+#include <mutex>
+
 // TODO: 마지막날 출력 관련(printf, cout) 모두 제거할 예정
 
 // ========================== 함수 ==========================
@@ -45,6 +47,8 @@ DWORD g_prevTime;
 CRITICAL_SECTION cs_for_logout;													// PlayerLogout(int) 내부 bool bPlayerLogout[] 사용을 위한 cs
 CRITICAL_SECTION cs_Cube;														// cs_Cube 사용을 위한 cs
 bool bPlayerLogout[MAXPLAYERCOUNT] = { false, };								// 로그아웃 중복 처리 방지 변수
+
+std::mutex mtx;
 
 int main(int argc, char *argv[])
 {
@@ -592,7 +596,7 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 			return 0;
 		}
 		// 남은 시간이 0보다 크거나 같으면 클라이언트로 시간 업데이트 및 전송
-		if (remainingSeconds >= 0) 
+		if (remainingSeconds > 0) 
 		{
 			for (int i = 0; i < socket_vector.size(); ++i)
 			{
@@ -641,8 +645,9 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 		--remainingSeconds;
 	}
 	std::cout << "시간 쓰레드 종료" << std::endl;
-	for (int i = 0; i < MAXPLAYERCOUNT; ++i)
+	for (int i = 0; i < MAXPLAYERCOUNT; ++i) {
 		PlayerLogout(i);
+	}
 	return 0;
 }
 
@@ -692,6 +697,7 @@ bool PlayerLogout(int playerNumber)
 	// 소켓 정리
 	EnterCriticalSection(&cs_for_logout);
 	if (socket_vector[playerNumber] != INVALID_SOCKET && !bPlayerLogout[playerNumber]) {
+		mtx.lock();
 		bPlayerLogout[playerNumber] = true;
 		printf(" %d 번째 플레이어가 로그아웃 하였습니다.\n ", playerNumber);
 		closesocket(socket_vector[playerNumber]);
@@ -705,6 +711,7 @@ bool PlayerLogout(int playerNumber)
 		socket_Cube_vector[playerNumber] = INVALID_SOCKET;
 		socket_SendPlayerData_vector[playerNumber] = INVALID_SOCKET;
 		socket_chat_vector[playerNumber] = INVALID_SOCKET;
+		mtx.unlock();
 
 		//socket_vector.erase(socket_vector.begin() + playerNumber);
 		//socket_Cube_vector.erase(socket_Cube_vector.begin() + playerNumber);
