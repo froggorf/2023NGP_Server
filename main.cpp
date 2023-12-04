@@ -518,13 +518,13 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 	while (1)
 	{
 		// 큐브 리시브
-		if(CubeSocket!=INVALID_SOCKET)
+		if (CubeSocket != INVALID_SOCKET)
 		{
 			retval = recv(CubeSocket, (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
 			if (retval == SOCKET_ERROR) {
-				for(int i=0; i<socket_Cube_vector.size();++i)
+				for (int i = 0; i < socket_Cube_vector.size(); ++i)
 				{
-					if(socket_Cube_vector[i]==CubeSocket)
+					if (socket_Cube_vector[i] == CubeSocket)
 					{
 						if (PlayerLogout(i)) return -1;
 						break;
@@ -533,56 +533,62 @@ DWORD WINAPI EchoClientRequestCube(LPVOID arg)
 				break;
 			}
 		}
-		
-		// 받은 큐브 정보 출력
-		printf("[Cube] -[%.2f, %.2f, %.2f] 위치에 [%.2f, %.2f, %.2f] 색 %s\n", 
-			clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z,
-			clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b,
-			clientCubeInput.AddorDelete ? "Add" : "Delete");
-		
-		// Cube Add
-		if (clientCubeInput.AddorDelete)	
+
+		if (remainingSeconds <= GAMETIME)
 		{
-			// 여기서 큐브와 사람 충돌체크
-			if (Check_Add_Cube(clientCubeInput))
-			{
-				//printf("해당 위치에 큐브 설치 불가능\n");
-			}
-			// 가능시에만 각 클라에게 큐브 정보 send
-			else
-			{
-				// add to Total_Cube
-				EnterCriticalSection(&cs_Cube);
-				Total_Cube.push_back(clientCubeInput);
-				LeaveCriticalSection(&cs_Cube);
 
-				// add to Cube Object
-				CObject* pObject = new CObject();
-				pObject->Set_Position(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
-				ppObjects[nObjects++] = pObject;
 
-				// 큐브 send to every client
-				for(int i=0; i<socket_Cube_vector.size(); ++i)
+			// 받은 큐브 정보 출력
+			printf("[Cube] -[%.2f, %.2f, %.2f] 위치에 [%.2f, %.2f, %.2f] 색 %s\n",
+				clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z,
+				clientCubeInput.fColor_r, clientCubeInput.fColor_g, clientCubeInput.fColor_b,
+				clientCubeInput.AddorDelete ? "Add" : "Delete");
+
+			// Cube Add
+			if (clientCubeInput.AddorDelete)
+			{
+				// 여기서 큐브와 사람 충돌체크
+				if (Check_Add_Cube(clientCubeInput))
 				{
-					if(socket_Cube_vector[i]!=INVALID_SOCKET)
+					//printf("해당 위치에 큐브 설치 불가능\n");
+				}
+				// 가능시에만 각 클라에게 큐브 정보 send
+				else
+				{
+					// add to Total_Cube
+					EnterCriticalSection(&cs_Cube);
+					Total_Cube.push_back(clientCubeInput);
+					LeaveCriticalSection(&cs_Cube);
+
+					// add to Cube Object
+					CObject* pObject = new CObject();
+					pObject->Set_Position(clientCubeInput.fPosition_x, clientCubeInput.fPosition_y, clientCubeInput.fPosition_z);
+					ppObjects[nObjects++] = pObject;
+
+					// 큐브 send to every client
+					for (int i = 0; i < socket_Cube_vector.size(); ++i)
 					{
-						int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
-						if (retval == SOCKET_ERROR) {
-							if (PlayerLogout(i)) return -1;
-							break;
+						if (socket_Cube_vector[i] != INVALID_SOCKET)
+						{
+							int retval = send(socket_Cube_vector[i], (char*)&clientCubeInput, sizeof(clientCubeInput), 0);
+							if (retval == SOCKET_ERROR) {
+								if (PlayerLogout(i)) return -1;
+								break;
+							}
 						}
 					}
+
 				}
-				
 			}
-		}
-		// Cube Delete
-		else
-		{
-			Delete_Cube(clientCubeInput);
+			// Cube Delete
+			else
+			{
+				Delete_Cube(clientCubeInput);
+			}
 		}
 	}
 	return 0;
+
 }
 
 DWORD WINAPI Send_Game_Time(LPVOID arg) {
@@ -624,22 +630,41 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 				if (fabs(cube.fColor_b - 1.0f) < FLT_EPSILON) ++player_cube_count[2];
 			}
 			LeaveCriticalSection(&cs_Cube);
+			int max = 0;
+			int number_max = 0;
+			for (int i = 0; i < 3; i++) {
+				if (player_cube_count[i] > max)
+				{
+					max = player_cube_count[i];
+					number_max = i;
+				}
+			}
+			switch (number_max) {
+			case 0:
+				number_max = -1;
+				break;
+			case 1:
+				number_max = -2;
+				break;
+			case 2:
+				number_max = -3;
+				break;
+			}
 			for (int i = 0; i < socket_vector.size(); ++i)
 			{
 				printf("[%d] 플레이어 큐브 설치 개수 - %d\n", i, player_cube_count[i]);
 				if (socket_vector[i] != INVALID_SOCKET)
 				{
-					int retval = send(socket_vector[i], (char*)&player_cube_count, sizeof(int) * MAXPLAYERCOUNT, 0);
-					if (retval == SOCKET_ERROR)
-					{
+					int retval = send(socket_vector[i], (char*)&number_max, sizeof(int), 0);
+					if (retval == SOCKET_ERROR) {
 						if (PlayerLogout(i)) return 0;
-						if (Current_Player_Count == 0) return 0;
-						break;
+						continue;
 					}
 					std::cout << i << "큐브 설치 전송됌" << std::endl;
 				}
 			}
 			break;
+
 		}
 		
 		Sleep(1000);	// 1초에 한번씩 보내도록 쓰레드를 sleep
@@ -715,10 +740,6 @@ bool PlayerLogout(int playerNumber)
 		socket_chat_vector[playerNumber] = INVALID_SOCKET;
 		mtx.unlock();
 
-		//socket_vector.erase(socket_vector.begin() + playerNumber);
-		//socket_Cube_vector.erase(socket_Cube_vector.begin() + playerNumber);
-		//socket_SendPlayerData_vector.erase(socket_SendPlayerData_vector.begin() + playerNumber);
-		//socket_chat_vector.erase(socket_chat_vector.begin() + playerNumber);
 
 		// 현재 플레이어 수 줄이기
 		Current_Player_Count -= 1;
@@ -959,7 +980,7 @@ void Delete_Cube(Cube_Info clientCubeInput)
 void Request_Delete_All_Cube() 
 {
 	// 현재 맵에 놓여있는 모든 큐브 정보 삭제로 바꿔서 전송
-	EnterCriticalSection(&cs_Cube);
+	/*EnterCriticalSection(&cs_Cube);
 	for (auto socket : socket_Cube_vector) {
 		for (auto cube : Total_Cube)
 		{
@@ -967,5 +988,7 @@ void Request_Delete_All_Cube()
 			send(socket, (char*)&cube, sizeof(cube), 0);
 		}
 	}
-	LeaveCriticalSection(&cs_Cube);
+	LeaveCriticalSection(&cs_Cube);*/
+
+	// 큐브 데이터 초기화
 }
