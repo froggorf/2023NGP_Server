@@ -326,15 +326,7 @@ DWORD WINAPI ProcessEchoChat(LPVOID arg)
 		{
 			retval = recv(echo_chat_socket, (char*)&chat_string, sizeof(ChatString), MSG_WAITALL);
 			if (retval == SOCKET_ERROR) {
-				for (int i = 0; i < MAXPLAYERCOUNT; ++i)
-				{
-					if (socket_chat_vector[i] == echo_chat_socket) {
-						return 0;
-						//if (PlayerLogout(i)) return 0;
-						
-						break;
-					}
-				}
+				return 0;
 				break;
 			}
 		}
@@ -435,7 +427,8 @@ DWORD WINAPI SendPlayerDataToClient(LPVOID arg)
 
 				vPlayer[i].Move(i, PLAYER_MOVE_DISTANCE * ElapsedTimeInSec, true);
 				vPlayer[i].Update(i, ElapsedTimeInSec);
-				vPlayer[i].Udt_N_Prcs_Collision(ppObjects, nObjects, i);
+				if(Current_Player_Count!=0)
+					vPlayer[i].Udt_N_Prcs_Collision(ppObjects, nObjects, i);
 
 				Player_Info[i].fPosition_x = vPlayer[i].Get_Position().x;
 				Player_Info[i].fPosition_y = vPlayer[i].Get_Position().y;
