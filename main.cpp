@@ -602,7 +602,7 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 			return 0;
 		}
 		// 남은 시간이 0보다 크거나 같으면 클라이언트로 시간 업데이트 및 전송
-		if (remainingSeconds > 0) 
+		if (remainingSeconds >= 0) 
 		{
 			for (int i = 0; i < socket_vector.size(); ++i)
 			{
