@@ -636,6 +636,7 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 						if (Current_Player_Count == 0) return 0;
 						break;
 					}
+					std::cout << i << "큐브 설치 전송됌" << std::endl;
 				}
 			}
 			break;
@@ -645,6 +646,7 @@ DWORD WINAPI Send_Game_Time(LPVOID arg) {
 		--remainingSeconds;
 	}
 	std::cout << "시간 쓰레드 종료" << std::endl;
+	Sleep(1000);
 	for (int i = 0; i < MAXPLAYERCOUNT; ++i) {
 		PlayerLogout(i);
 	}
